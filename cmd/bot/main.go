@@ -1,7 +1,7 @@
-package bot
+package main
 
 import "log"
 
-func Run() {
+func main() {
 	log.Println("Bot starting...")
 }
