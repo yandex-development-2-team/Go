@@ -9,12 +9,28 @@ import (
 )
 
 type Config struct {
-	TelegramBotToken string `yaml:"telegram_bot_token"`
-	PostgresURL      string `yaml:"postgres_url"`
-	Port             int    `yaml:"port"`
-	Environment      string `yaml:"environment"` // dev/prod
-	PrometheusPort   int    `yaml:"prometheus_port"`
-	LogLevel         string `yaml:"log_level"`
+	Server    ServerConfig    `yaml:"server"`
+	Telegram  TelegramConfig  `yaml:"telegram"`
+	Database  DatabaseConfig  `yaml:"database"`
+	Logger    LoggerConfig    `yaml:"logger"`
+}
+
+type ServerConfig struct {
+	Port           int    `yaml:"port"`
+	Environment    string `yaml:"environment"` // dev/prod
+	PrometheusPort int    `yaml:"prometheus_port"`
+}
+
+type TelegramConfig struct {
+	BotToken string `yaml:"bot_token"`
+}
+
+type DatabaseConfig struct {
+	PostgresURL string `yaml:"postgres_url"`
+}
+
+type LoggerConfig struct {
+	Level string `yaml:"level"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -31,38 +47,42 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
+	// ENV overrides
+
 	if v := os.Getenv("BOT_TOKEN"); v != "" {
-		cfg.TelegramBotToken = v
+		cfg.Telegram.BotToken = v
 	}
 
 	if v := os.Getenv("POSTGRES_URL"); v != "" {
-		cfg.PostgresURL = v
+		cfg.Database.PostgresURL = v
 	}
 
 	if v := os.Getenv("PORT"); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
-			cfg.Port = i
+			cfg.Server.Port = i
 		}
 	}
 
 	if v := os.Getenv("ENVIRONMENT"); v != "" {
-		cfg.Environment = v
+		cfg.Server.Environment = v
 	}
 
 	if v := os.Getenv("PROMETHEUS_PORT"); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
-			cfg.PrometheusPort = i
+			cfg.Server.PrometheusPort = i
 		}
 	}
 
 	if v := os.Getenv("LOG_LEVEL"); v != "" {
-		cfg.LogLevel = v
+		cfg.Logger.Level = v
 	}
 
-	if cfg.TelegramBotToken == "" {
+	// validation
+
+	if cfg.Telegram.BotToken == "" {
 		return nil, errors.New("telegram bot token is required")
 	}
-	if cfg.PostgresURL == "" {
+	if cfg.Database.PostgresURL == "" {
 		return nil, errors.New("postgres url is required")
 	}
 
