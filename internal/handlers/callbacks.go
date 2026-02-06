@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/yandex-development-2-team/Go/internal/config"
 
-	. "github.com/yandex-development-2-team/Go/config"
 	"go.uber.org/zap"
 )
 
@@ -32,7 +32,9 @@ func HandleCallback(router *CallbackRouter, query *tgbotapi.CallbackQuery) error
 	}
 
 	// Вызываем метод Handle у найденного handler'а
-	err = handler.Handle(congig.Config, query)
+
+	ctx, err := config.LoadConfig()
+	err = handler.Handle(ctx, query)
 	if err != nil {
 		return err
 	}
