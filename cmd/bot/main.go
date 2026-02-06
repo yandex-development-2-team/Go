@@ -36,6 +36,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	updates, err := tg.GetUpdates(ctx, 30*time.Second)
+	if err != nil {
+		log.Fatal("failed_to_get_updates", zap.Error(err))
+	}
+
 	// graceful shutdown: по SIGINT/SIGTERM отменяем контекст
 	sh := shutdown.NewShutdownHandler(log)
 	go func() {
@@ -43,12 +48,7 @@ func main() {
 			log.Error("Graceful shutdown completed with errors", zap.Error(err))
 		}
 	}()
-	<-ctx.Done()
 
-	updates, err := tg.GetUpdates(ctx, 30*time.Second)
-	if err != nil {
-		log.Fatal("failed_to_get_updates", zap.Error(err))
-	}
 	for range updates {
 		// обработчики добавятся позже; важно лишь, что polling работает и не падает
 	}
