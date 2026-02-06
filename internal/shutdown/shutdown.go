@@ -7,11 +7,14 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type ShutdownHandler struct {
 	signals chan os.Signal
 	timeout time.Duration
+	logger  *zap.Logger
 }
 
 type ShutdownTask struct {
@@ -19,10 +22,11 @@ type ShutdownTask struct {
 	Fn   func(context.Context) error
 }
 
-func NewShutdownHandler() *ShutdownHandler {
+func NewShutdownHandler(logger *zap.Logger) *ShutdownHandler {
 	return &ShutdownHandler{
 		signals: make(chan os.Signal, 1),
 		timeout: 30 * time.Second,
+		logger:  logger,
 	}
 }
 
@@ -31,14 +35,14 @@ func (s *ShutdownHandler) WaitForShutdown(ctx context.Context, cancel context.Ca
 	defer signal.Stop(s.signals)
 
 	select {
-	case <-s.signals:
-		//logger
+	case sig := <-s.signals:
+		s.logger.Info("Shutdown signal received", zap.String("signal", sig.String()))
 	case <-ctx.Done():
-		//logger
+		s.logger.Info("Context canceled before shutdown signal")
 		return nil
 	}
 
-	//logger
+	s.logger.Info("Starting graceful shutdown")
 	cancel()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), s.timeout)
@@ -55,12 +59,12 @@ func (s *ShutdownHandler) WaitForShutdown(ctx context.Context, cancel context.Ca
 		started++
 
 		go func(t ShutdownTask) {
-			//logger
+			s.logger.Info("Shutdown task started", zap.String("task", t.Name))
 			err := t.Fn(shutdownCtx)
 			if err != nil {
-				//logger
+				s.logger.Error("Shutdown task failed", zap.String("task", t.Name), zap.Error(err))
 			} else {
-				//logger
+				s.logger.Info("Shutdown task completed", zap.String("task", t.Name))
 			}
 			errCh <- err
 		}(task)
@@ -75,8 +79,8 @@ func (s *ShutdownHandler) WaitForShutdown(ctx context.Context, cancel context.Ca
 				errs = append(errs, err)
 			}
 		case <-shutdownCtx.Done():
-			//logger
-			errs = append(errs, errors.New("graceful shutdown тайм-аут превышен"))
+			s.logger.Error("Graceful shutdown timeout exceeded", zap.Duration("timeout", s.timeout))
+			errs = append(errs, errors.New("graceful shutdown timeout exceeded"))
 
 		CollectErrors:
 			for {
@@ -95,10 +99,10 @@ func (s *ShutdownHandler) WaitForShutdown(ctx context.Context, cancel context.Ca
 	}
 
 	if len(errs) > 0 {
-		//logger
+		s.logger.Error("Graceful shutdown finished with errors", zap.Errors("errors", errs))
 		return errors.Join(errs...)
 	}
 
-	//logger
+	s.logger.Info("Graceful shutdown completed successfully")
 	return nil
 }
