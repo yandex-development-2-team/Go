@@ -26,7 +26,7 @@ func HandleCallback(router *CallbackRouter, query *tgbotapi.CallbackQuery) error
 	handler, ok := router.handlers[buttonID]
 	if !ok {
 		// Если handler не найден, возвращаем ошибку или логируем событие
-		err := fmt.Errorf("oбработчик для идентификатора кнопки не найден: %s", buttonID)
+		err := fmt.Errorf("oбработчик для идентификатора кнопки не найден")
 		router.logger.Error("handler не найден для кнопки", zap.Error(err), zap.String("buttonID", buttonID))
 		return err
 	}
