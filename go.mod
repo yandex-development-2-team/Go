@@ -5,13 +5,8 @@ go 1.23.0
 toolchain go1.24.12
 
 require (
-	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1 // indirect
-	github.com/jmoiron/sqlx v1.4.0 // indirect
-	github.com/lib/pq v1.11.1 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
-	go.uber.org/multierr v1.10.0 // indirect
-	go.uber.org/zap v1.27.1 // indirect
-  go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/zap v1.27.1
 	gopkg.in/yaml.v3 v3.0.1
-  go.uber.org/zap v1.27.1
 )
+
+require go.uber.org/multierr v1.10.0 // indirect

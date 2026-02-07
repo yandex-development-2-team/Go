@@ -1,19 +1,9 @@
 package main
 
-import (
-	"context"
-	"fmt"
-	"log"
-	"strconv"
-
-	"github.com/yandex-development-2-team/Go/internal/database"
-	"github.com/yandex-development-2-team/Go/internal/logger"
-	"github.com/yandex-development-2-team/Go/internal/shutdown"
-	"go.uber.org/zap"
-)
+import "fmt"
 
 func main() {
-	//логирование для: Запуска приложения
+	/*//логирование для: Запуска приложения
 	env := "development"
 	if env != "development" && env != "prodaction" {
 		log.Fatal("Ошибка при указании метода логирования")
@@ -38,7 +28,7 @@ func main() {
 	defer cancel()
 
 	sh := shutdown.NewShutdownHandler(logger)
-	// Вызов Graceful shutdown
+	//Вызов Graceful shutdown
 	go func() {
 		if err := sh.WaitForShutdown(ctx, cancel,
 			shutdown.ShutdownTask{
@@ -57,5 +47,7 @@ func main() {
 			logger.Error("Graceful shutdown completed with errors", zap.Error(err))
 		}
 	}()
-	<-ctx.Done()
+	<-ctx.Done()*/
+
+	fmt.Println("Hello World")
 }
