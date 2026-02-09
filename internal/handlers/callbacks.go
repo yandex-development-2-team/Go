@@ -34,13 +34,15 @@ func HandleCallback(router *CallbackRouter, query *tgbotapi.CallbackQuery) error
 
 	// Вызываем метод Handle у найденного handler'а
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)s
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	err := handler.Handle(ctx, query)
 	if err != nil {
 		return err
 	}
+	/* //когда будет bot
 	_, err = bot.AnswerCallbackQuery(tgbotapi.CallbackQueryID{CallbackQueryID: query.ID, Text: "Вы нажали " + button})
+	*/
 	end := time.Now()
 	elapsed := end.Sub(start)
 	router.logger.Info("Нажата кнопка "+button, zap.String("user_id", query.ID), zap.String("callback_data", button), zap.Duration("время обработки", elapsed))
