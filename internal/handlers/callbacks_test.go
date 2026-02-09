@@ -10,16 +10,16 @@ import (
 	"go.uber.org/zap"
 )
 
-type Button1Handler struct{}
+type ButtonHandlerOne struct{}
 
-func (b *Button1Handler) Handle(ctx context.Context, q *tgbotapi.CallbackQuery) error {
+func (b *ButtonHandlerOne) Handle(ctx context.Context, q *tgbotapi.CallbackQuery) error {
 	fmt.Println("Запуск хендлера1")
 	return nil
 }
 
-type Button2Handler struct{}
+type ButtonHandlerTwo struct{}
 
-func (b *Button2Handler) Handle(ctx context.Context, q *tgbotapi.CallbackQuery) error {
+func (b *ButtonHandlerTwo) Handle(ctx context.Context, q *tgbotapi.CallbackQuery) error {
 	fmt.Println("Запуск хендлера2")
 	return nil
 }
@@ -32,8 +32,8 @@ func TestHandleCallback(t *testing.T) {
 		logger:   logger,
 	}
 
-	router.handlers["button1"] = &Button1Handler{}
-	router.handlers["button2"] = &Button2Handler{}
+	router.handlers["button1"] = &ButtonHandlerOne{}
+	router.handlers["button2"] = &ButtonHandlerTwo{}
 
 	query := &tgbotapi.CallbackQuery{
 		ID:   "your_callback_query_id",
