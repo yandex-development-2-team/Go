@@ -9,3 +9,6 @@ test:
 
 lint:
 	golangci-lint run
+
+migrate-create:
+	goose -dir migrations create $(name) sql
