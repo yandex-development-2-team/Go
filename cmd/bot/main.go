@@ -15,7 +15,6 @@ import (
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		// на этом этапе zap ещё нет — поэтому panic/стандартная ошибка
 		panic(err)
 	}
 
