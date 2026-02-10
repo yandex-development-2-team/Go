@@ -2,60 +2,53 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"strconv"
+	"strings"
+	"time"
 
-	"github.com/yandex-development-2-team/Go/internal/database"
+	"github.com/yandex-development-2-team/Go/internal/bot"
+	"github.com/yandex-development-2-team/Go/internal/config"
 	"github.com/yandex-development-2-team/Go/internal/logger"
 	"github.com/yandex-development-2-team/Go/internal/shutdown"
 	"go.uber.org/zap"
 )
 
 func main() {
-	//логирование для: Запуска приложения
-	env := "development"
-	if env != "development" && env != "prodaction" {
-		log.Fatal("Ошибка при указании метода логирования")
-	}
-	logger := logger.NewLogger(env)
-	logger.Info("bot_started", zap.String("token_length", strconv.Itoa(len("token"))))
-
-	//логирование для: Ошибок БД
-	err := database.RunMigrations()
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		logger.Error("database_error", zap.Error(err), zap.String("operation", "get_user"))
+		panic(err)
 	}
 
-	//логирование для: Входящих сообщений Telegram (только ID юзера, без content для privacy)
-	logger.Info("Входящее сообщение от пользователя", zap.String("user_id", "123"))
+	// internal/logger.NewLogger ожидает "development" / "production"
+	env := "development"
+	if strings.ToLower(cfg.Server.Environment) == "prod" {
+		env = "production"
+	}
 
-	//логирование для: Критических ошибок
-	err = fmt.Errorf("Критическая ошибка")
-	logger.Fatal("Критическая ошибка", zap.Error(err))
+	log := logger.NewLogger(env)
+	defer func() { _ = log.Sync() }()
+
+	tg, err := bot.NewTelegramBot(cfg.Telegram.BotToken, log)
+	if err != nil {
+		log.Fatal("failed_to_init_bot", zap.Error(err))
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sh := shutdown.NewShutdownHandler(logger)
-	// Вызов Graceful shutdown
+	updates, err := tg.GetUpdates(ctx, 30*time.Second)
+	if err != nil {
+		log.Fatal("failed_to_get_updates", zap.Error(err))
+	}
+
+	// graceful shutdown: по SIGINT/SIGTERM отменяем контекст
+	sh := shutdown.NewShutdownHandler(log)
 	go func() {
-		if err := sh.WaitForShutdown(ctx, cancel,
-			shutdown.ShutdownTask{
-				Name: "TGUpdates",
-				Fn:   updates.Stop, // Когда в будущем будет реализовано, вызов функции для остановки приема новых обновлений от TG API
-			},
-			shutdown.ShutdownTask{
-				Name: "Database",
-				Fn:   db.Close, // Когда в будущем будет реализовано, вызов функции для завершения pending queries
-			},
-			shutdown.ShutdownTask{
-				Name: "Prometheus metrics",
-				Fn:   metricsServer.Stop, // Когда в будущем будет реализовано, завершение prometheus metrics
-			},
-		); err != nil {
-			logger.Error("Graceful shutdown completed with errors", zap.Error(err))
+		if err := sh.WaitForShutdown(ctx, cancel); err != nil {
+			log.Error("Graceful shutdown completed with errors", zap.Error(err))
 		}
 	}()
-	<-ctx.Done()
+
+	for range updates {
+		// обработчики добавятся позже; важно лишь, что polling работает и не падает
+	}
 }

@@ -16,3 +16,5 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 )
+
+require go.uber.org/multierr v1.10.0 // indirect
