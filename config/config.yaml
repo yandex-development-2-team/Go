@@ -1,0 +1,13 @@
+server:
+  port: 8080
+  environment: dev
+  prometheus_port: 9090
+
+telegram:
+  bot_token: ""
+
+database:
+  postgres_url: "postgres://user:pass@localhost:5432/bot_db"
+
+logger:
+  level: "info"
