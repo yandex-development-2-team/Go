@@ -1,6 +1,41 @@
 package main
 
 import (
+<<<<<<< HEAD
+	"database/sql"
+	"log"
+	"os"
+
+	_ "github.com/lib/pq"
+
+	dbm "github.com/yandex-development-2-team/Go/internal/database"
+)
+
+func main() {
+	log.Println("Bot starting...")
+
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Println("DATABASE_URL not set; skipping migrations")
+		return
+	}
+
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		log.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("ping db: %v", err)
+	}
+
+	if err := dbm.RunMigrations(db); err != nil {
+		log.Fatalf("migrations failed: %v", err)
+	}
+
+	log.Println("Migrations applied successfully")
+=======
 	"context"
 	"strings"
 	"time"
@@ -51,4 +86,5 @@ func main() {
 	for range updates {
 		// обработчики добавятся позже; важно лишь, что polling работает и не падает
 	}
+>>>>>>> 96e68a5df650fadd3caec3fbafc18e13bbc9fc93
 }
