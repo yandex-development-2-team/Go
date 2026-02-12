@@ -1,7 +1,6 @@
 package database
 
 import (
-<<<<<<< HEAD
 	"database/sql"
 	"fmt"
 	"log"
@@ -35,11 +34,4 @@ func RunMigrations(db *sql.DB) error {
 	}
 	log.Printf("DB migration version: %d, applied migrations: %d", ver, count)
 	return nil
-=======
-	"fmt"
-)
-
-func RunMigrations() error {
-	return fmt.Errorf("Произошла ошибка в функции RunMigrations (БД)")
->>>>>>> 96e68a5df650fadd3caec3fbafc18e13bbc9fc93
 }
