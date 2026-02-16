@@ -7,45 +7,26 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/yandex-development-2-team/Go/internal/database/repository"
 	"go.uber.org/zap"
 )
 
 const (
-	callback           = "box_"
-	callbackBackToMain = "back_to_main"
-	callbackMenu       = "box_solutions"
-
-	serviceTretyakov = 1
-	servicePushkin   = 2
-	serviceTheatre   = 3
-	serviceTennis    = 4
-	servicePadel     = 5
-	serviceDigest    = 6
+	callback     = "box_"
+	callbackMenu = "box_solutions"
 )
 
-type service struct {
-	id    int
-	title string
-}
-
-var services = []service{
-	{serviceTretyakov, "Третьяковская галерея"},
-	{servicePushkin, "Пушкинский музей"},
-	{serviceTheatre, "Театр на Малой Бронной"},
-	{serviceTennis, "Теннис в Лужниках"},
-	{servicePadel, "Падел корт в Сити"},
-	{serviceDigest, "Дайджест светских событий"},
-}
-
 type BoxSolutionsHandler struct {
-	bot    *tgbotapi.BotAPI
-	logger *zap.Logger
+	bot      *tgbotapi.BotAPI
+	logger   *zap.Logger
+	services *repository.ServiceRepository
 }
 
-func NewBoxSolutionsHandler(bot *tgbotapi.BotAPI, logger *zap.Logger) *BoxSolutionsHandler {
+func NewBoxSolutionsHandler(bot *tgbotapi.BotAPI, logger *zap.Logger, services *repository.ServiceRepository) *BoxSolutionsHandler {
 	return &BoxSolutionsHandler{
-		bot:    bot,
-		logger: logger,
+		bot:      bot,
+		logger:   logger,
+		services: services,
 	}
 }
 
@@ -58,16 +39,22 @@ func (h *BoxSolutionsHandler) Handle(ctx context.Context, query *tgbotapi.Callba
 	if data == callbackMenu {
 		h.logger.Info("box_solutions_menu_opened", zap.Int64("user_id", userID), zap.Int64("chat_id", chatID))
 
+		services, err := h.services.GetServicesOfBoxSolutions(ctx)
+		if err != nil {
+			h.logger.Error("failed_to_get_services", zap.Error(err))
+			return err
+		}
+
 		var rows [][]tgbotapi.InlineKeyboardButton
 
 		for _, svc := range services {
-			callbackData := fmt.Sprintf("%s%d", callback, svc.id)
-			button := tgbotapi.NewInlineKeyboardButtonData(svc.title, callbackData)
+			callbackData := fmt.Sprintf("%s%d", callback, svc.ID)
+			button := tgbotapi.NewInlineKeyboardButtonData(svc.Title, callbackData)
 			rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
 		}
 
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Назад", callbackBackToMain),
+			tgbotapi.NewInlineKeyboardButtonData("Назад", CallbackBackToMain),
 		))
 
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
@@ -104,9 +91,8 @@ func (h *BoxSolutionsHandler) Handle(ctx context.Context, query *tgbotapi.Callba
 		return HandleServiceDetail(serviceID, userID)
 	}
 
-	if data == callbackBackToMain {
-		h.logger.Info("back_to_main_clicked", zap.Int64("user_id", userID))
-		return nil
+	if data == CallbackBackToMain {
+		return NewMainMenuHandler(h.bot, h.logger).Handle(ctx, query)
 	}
 
 	return nil
