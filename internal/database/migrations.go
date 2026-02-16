@@ -8,30 +8,41 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-// RunMigrations применяет миграции из каталога migrations/
-// Выводит текущую версию базы данных и количество примененных миграций
-func RunMigrations(db *sql.DB) error {
-	goose.SetDialect("postgres")
+const migrationsDir = "migrations"
 
-	if err := goose.Up(db, "migrations"); err != nil {
+func RunMigrations(db *sql.DB) error {
+	if db == nil {
+		return fmt.Errorf("db is nil")
+	}
+
+	if err := goose.SetDialect("postgres"); err != nil {
+		return fmt.Errorf("set goose dialect: %w", err)
+	}
+
+	_, err := goose.EnsureDBVersion(db)
+	if err != nil {
+		return fmt.Errorf("ensure goose db version: %w", err)
+	}
+
+	beforeVersion, err := goose.GetDBVersion(db)
+	if err != nil {
+		return fmt.Errorf("get db version before migrations: %w", err)
+	}
+
+	if err := goose.Up(db, migrationsDir); err != nil {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
 
-	// После применения считать текущую версию и количество примененных изменений из таблицы goose
-	var version sql.NullInt64
-	var count int
-
-	if err := db.QueryRow("SELECT COALESCE(MAX(version_id),0) FROM goose_db_version WHERE is_applied = TRUE").Scan(&version); err != nil {
-		return fmt.Errorf("query migration version: %w", err)
-	}
-	if err := db.QueryRow("SELECT COUNT(*) FROM goose_db_version WHERE is_applied = TRUE").Scan(&count); err != nil {
-		return fmt.Errorf("query migration count: %w", err)
+	afterVersion, err := goose.GetDBVersion(db)
+	if err != nil {
+		return fmt.Errorf("get db version after migrations: %w", err)
 	}
 
-	ver := int64(0)
-	if version.Valid {
-		ver = version.Int64
+	appliedThisRun := int(afterVersion - beforeVersion)
+	if appliedThisRun < 0 {
+		appliedThisRun = 0
 	}
-	log.Printf("DB migration version: %d, applied migrations: %d", ver, count)
+
+	log.Printf("db_migrations: version=%d applied=%d", afterVersion, appliedThisRun)
 	return nil
 }
