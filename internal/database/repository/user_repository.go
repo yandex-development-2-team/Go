@@ -7,14 +7,19 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/jmoiron/sqlx"
-
 	"github.com/yandex-development-2-team/Go/internal/models"
 )
 
 type UserRepository struct {
-	db     *sqlx.DB
+	db     DatabaseInterface
 	logger *zap.Logger
+}
+
+func NewUserRepository(db DatabaseInterface, logger *zap.Logger) *UserRepository {
+	return &UserRepository{
+		db:     db,
+		logger: logger,
+	}
 }
 
 func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, username, firstName, lastName string) (*models.User, error) {
@@ -35,11 +40,26 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 		return nil, err
 	}
 	// если не существует создать запись
-	_, err = u.db.ExecContext(ctx, "INSERT INTO users (telegram_id, username, first_name, last_name) VALUES ($1, $2, $3, $4)", telegramID, username, firstName, lastName)
+	res, err := u.db.ExecContext(ctx, "INSERT INTO users (telegram_id, username, first_name, last_name) VALUES ($1, $2, $3, $4)", telegramID, username, firstName, lastName)
 	if err != nil {
 		u.logger.Error("error creating a user")
 		return nil, err
 	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		u.logger.Error("failed to get rows affected", zap.Error(err))
+		return nil, err
+	}
+	if rowsAffected == 0 {
+		u.logger.Error("no user created")
+		return nil, errors.New("no user created")
+	}
+	userID, err := res.LastInsertId()
+	if err != nil {
+		u.logger.Error("failed to get last inserted id", zap.Error(err))
+		return nil, err
+	}
+	err = u.db.GetContext(ctx, &user, "SELECT * FROM users WHERE ID = $1", userID)
 	u.logger.Info("user created", zap.Int64("telegram_id", telegramID))
 	return &user, nil
 }
@@ -103,3 +123,4 @@ func (u *UserRepository) IsAdmin(ctx context.Context, telegramID int64) (bool, e
 	}
 	return user.IsAdmin, nil
 }
+
