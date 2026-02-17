@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/yandex-development-2-team/Go/internal/bot"
 	"github.com/yandex-development-2-team/Go/internal/config"
+	"github.com/yandex-development-2-team/Go/internal/database"
 	"github.com/yandex-development-2-team/Go/internal/logger"
 	"github.com/yandex-development-2-team/Go/internal/shutdown"
 	"go.uber.org/zap"
@@ -26,6 +29,20 @@ func main() {
 
 	log := logger.NewLogger(env)
 	defer func() { _ = log.Sync() }()
+
+	db, err := sql.Open("postgres", cfg.Database.PostgresURL)
+	if err != nil {
+		log.Fatal("failed_to_open_db", zap.Error(err))
+	}
+	defer func() { _ = db.Close() }()
+
+	if err := db.Ping(); err != nil {
+		log.Fatal("failed_to_ping_db", zap.Error(err))
+	}
+
+	if err := database.RunMigrations(db); err != nil {
+		log.Fatal("failed_to_run_migrations", zap.Error(err))
+	}
 
 	tg, err := bot.NewTelegramBot(cfg.Telegram.BotToken, log)
 	if err != nil {
