@@ -10,7 +10,6 @@ test:
 lint:
 	golangci-lint run
 
-POSTGRES_URL ?= $(POSTGRES_URL)
 MIGRATIONS_DIR ?= migrations
 GOOSE := go run github.com/pressly/goose/v3/cmd/goose@v3.26.0
 
