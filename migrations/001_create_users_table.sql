@@ -1,5 +1,6 @@
 
 -- +goose Up
+-- +goose StatementBegin
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     telegram_id BIGINT NOT NULL UNIQUE,
@@ -12,7 +13,10 @@ CREATE TABLE users (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_users_telegram_id ON users(telegram_id);
+-- +goose StatementEnd
 
 -- +goose Down
+-- +goose StatementBegin
 DROP INDEX IF EXISTS idx_users_telegram_id;
 DROP TABLE IF EXISTS users;
+-- +goose StatementEnd
