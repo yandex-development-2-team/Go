@@ -5,13 +5,12 @@ services:
       dockerfile: Dockerfile
     container_name: bot_app
     environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      POSTGRES_DB: ${POSTGRES_DB:-bot_db}
-      POSTGRES_USER: ${POSTGRES_USER:-bot_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bot_password}
-      POSTGRES_HOST: bot_postgres
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      SERVER_PORT: ${SERVER_PORT:-8080}
+      BOT_TOKEN: ${BOT_TOKEN}
+      POSTGRES_URL: postgres://bot_user:bot_password@bot_postgres:5432/bot_db?sslmode=disable
+      PORT: ${PORT:-8080}
+      ENVIRONMENT: docker
+      PROMETHEUS_PORT: 9090
+      LOG_LEVEL: info
     ports:
       - "${SERVER_PORT:-8080}:8080"
     volumes:
@@ -30,20 +29,17 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-bot_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bot_password}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-bot_db}" ]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-bot_db}"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 15s
     networks:
       - bot_network
-
-volumes:
-  postgres_data:
 
 networks:
   bot_network:
