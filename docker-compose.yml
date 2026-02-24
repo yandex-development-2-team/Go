@@ -1,5 +1,46 @@
 services:
-  server:
-    build: .
+  bot_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bot_app
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      POSTGRES_URL: postgres://bot_user:bot_password@bot_postgres:5432/bot_db?sslmode=disable
+      PORT: ${PORT:-8080}
+      ENVIRONMENT: docker
+      PROMETHEUS_PORT: 9090
+      LOG_LEVEL: info
     ports:
-      - "8080:8080"
+      - "${SERVER_PORT:-8080}:8080"
+    volumes:
+      - .:/app
+    depends_on:
+      bot_postgres:
+        condition: service_healthy
+    networks:
+      - bot_network
+
+  bot_postgres:
+    image: postgres:15-alpine
+    container_name: bot_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bot_db}
+      POSTGRES_USER: ${POSTGRES_USER:-bot_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bot_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-bot_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - bot_network
+
+networks:
+  bot_network:
+    driver: bridge

@@ -7,7 +7,7 @@ telegram:
   bot_token: ""
 
 database:
-  postgres_url: "postgres://user:pass@localhost:5432/bot_db"
+  postgres_url: ""
 
 logger:
   level: "info"
