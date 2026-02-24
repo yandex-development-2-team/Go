@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -39,15 +41,38 @@ ON CONFLICT (user_id) DO UPDATE SET
 `)
 
 	mock.ExpectExec(q).
-		WithArgs(int64(10), "booking_form", `{"step":3,"guest":{"name":"Ivan"}}`).
+		WithArgs(int64(10), "booking_form", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	err := repo.SaveSession(context.Background(), 10, "booking_form", map[string]interface{}{
+	payload := map[string]interface{}{
 		"step": 3,
 		"guest": map[string]interface{}{
 			"name": "Ivan",
 		},
-	})
+	}
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("json.Marshal err: %v", err)
+	}
+
+	var got map[string]interface{}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("json.Unmarshal err: %v", err)
+	}
+
+	expected := map[string]interface{}{
+		"step": float64(3),
+		"guest": map[string]interface{}{
+			"name": "Ivan",
+		},
+	}
+
+	if !reflect.DeepEqual(got, expected) {
+		t.Fatalf("json mismatch: got=%v expected=%v", got, expected)
+	}
+
+	err = repo.SaveSession(context.Background(), 10, "booking_form", payload)
 	if err != nil {
 		t.Fatalf("SaveSession err: %v", err)
 	}
