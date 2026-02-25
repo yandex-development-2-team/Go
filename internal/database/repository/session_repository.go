@@ -14,6 +14,30 @@ import (
 	"github.com/yandex-development-2-team/Go/internal/models"
 )
 
+const (
+	saveSessionQuery = `
+INSERT INTO user_sessions (user_id, current_state, state_data)
+VALUES ($1, $2, $3::jsonb)
+ON CONFLICT (user_id) DO UPDATE SET
+	current_state = EXCLUDED.current_state,
+	state_data = EXCLUDED.state_data,
+	updated_at = CURRENT_TIMESTAMP
+`
+	getSessionQuery = `
+SELECT id, user_id, current_state, state_data, created_at, updated_at
+FROM user_sessions
+WHERE user_id = $1
+`
+	clearSessionQuery = `DELETE FROM user_sessions WHERE user_id = $1`
+
+	updateSessionStateQuery = `
+UPDATE user_sessions
+SET current_state = $2,
+	updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+)
+
 type SessionRepository struct {
 	db     *sqlx.DB
 	logger *zap.Logger
@@ -42,15 +66,7 @@ func (r *SessionRepository) SaveSession(ctx context.Context, userID int64, state
 		return fmt.Errorf("marshal state_data: %w", err)
 	}
 
-	const q = `
-INSERT INTO user_sessions (user_id, current_state, state_data)
-VALUES ($1, $2, $3::jsonb)
-ON CONFLICT (user_id) DO UPDATE SET
-	current_state = EXCLUDED.current_state,
-	state_data = EXCLUDED.state_data,
-	updated_at = CURRENT_TIMESTAMP
-`
-	_, err = r.db.ExecContext(ctx, q, userID, state, string(raw))
+	_, err = r.db.ExecContext(ctx, saveSessionQuery, userID, state, string(raw))
 	if err != nil {
 		r.logger.Error("save_session_failed", zap.Error(err), zap.Int64("user_id", userID))
 		return fmt.Errorf("save session: %w", err)
@@ -67,12 +83,6 @@ func (r *SessionRepository) GetSession(ctx context.Context, userID int64) (*mode
 		return nil, fmt.Errorf("invalid userID")
 	}
 
-	const q = `
-SELECT id, user_id, current_state, state_data, created_at, updated_at
-FROM user_sessions
-WHERE user_id = $1
-`
-
 	var (
 		s       models.UserSession
 		stateJS []byte
@@ -80,7 +90,7 @@ WHERE user_id = $1
 		updated time.Time
 	)
 
-	err := r.db.QueryRowxContext(ctx, q, userID).Scan(
+	err := r.db.QueryRowxContext(ctx, getSessionQuery, userID).Scan(
 		&s.ID,
 		&s.UserID,
 		&s.CurrentState,
@@ -119,8 +129,7 @@ func (r *SessionRepository) ClearSession(ctx context.Context, userID int64) erro
 		return fmt.Errorf("invalid userID")
 	}
 
-	const q = `DELETE FROM user_sessions WHERE user_id = $1`
-	_, err := r.db.ExecContext(ctx, q, userID)
+	_, err := r.db.ExecContext(ctx, clearSessionQuery, userID)
 	if err != nil {
 		return fmt.Errorf("clear session: %w", err)
 	}
@@ -135,13 +144,7 @@ func (r *SessionRepository) UpdateSessionState(ctx context.Context, userID int64
 		return fmt.Errorf("invalid userID")
 	}
 
-	const q = `
-UPDATE user_sessions
-SET current_state = $2,
-	updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
-`
-	_, err := r.db.ExecContext(ctx, q, userID, newState)
+	_, err := r.db.ExecContext(ctx, updateSessionStateQuery, userID, newState)
 	if err != nil {
 		return fmt.Errorf("update session state: %w", err)
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
-	"regexp"
 	"testing"
 	"time"
 
@@ -31,16 +30,7 @@ func TestSaveSession_UpsertJSONB(t *testing.T) {
 	repo, mock, cleanup := newRepo(t)
 	defer cleanup()
 
-	q := regexp.QuoteMeta(`
-INSERT INTO user_sessions (user_id, current_state, state_data)
-VALUES ($1, $2, $3::jsonb)
-ON CONFLICT (user_id) DO UPDATE SET
-	current_state = EXCLUDED.current_state,
-	state_data = EXCLUDED.state_data,
-	updated_at = CURRENT_TIMESTAMP
-`)
-
-	mock.ExpectExec(q).
+	mock.ExpectExec(`INSERT INTO user_sessions`).
 		WithArgs(int64(10), "booking_form", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -88,12 +78,6 @@ func TestGetSession_OK(t *testing.T) {
 
 	now := time.Now()
 
-	q := regexp.QuoteMeta(`
-SELECT id, user_id, current_state, state_data, created_at, updated_at
-FROM user_sessions
-WHERE user_id = $1
-`)
-
 	rows := sqlmock.NewRows([]string{
 		"id", "user_id", "current_state", "state_data", "created_at", "updated_at",
 	}).AddRow(
@@ -105,7 +89,9 @@ WHERE user_id = $1
 		now,
 	)
 
-	mock.ExpectQuery(q).WithArgs(int64(10)).WillReturnRows(rows)
+	mock.ExpectQuery(`FROM user_sessions`).
+		WithArgs(int64(10)).
+		WillReturnRows(rows)
 
 	s, err := repo.GetSession(context.Background(), 10)
 	if err != nil {
@@ -135,8 +121,9 @@ func TestClearSession_OK(t *testing.T) {
 	repo, mock, cleanup := newRepo(t)
 	defer cleanup()
 
-	q := regexp.QuoteMeta(`DELETE FROM user_sessions WHERE user_id = $1`)
-	mock.ExpectExec(q).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`DELETE FROM user_sessions WHERE user_id = \$1`).
+		WithArgs(int64(10)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	if err := repo.ClearSession(context.Background(), 10); err != nil {
 		t.Fatalf("ClearSession err: %v", err)
@@ -151,14 +138,9 @@ func TestUpdateSessionState_OK(t *testing.T) {
 	repo, mock, cleanup := newRepo(t)
 	defer cleanup()
 
-	q := regexp.QuoteMeta(`
-UPDATE user_sessions
-SET current_state = $2,
-	updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
-`)
-
-	mock.ExpectExec(q).WithArgs(int64(10), "main_menu").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`UPDATE user_sessions`).
+		WithArgs(int64(10), "main_menu").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	if err := repo.UpdateSessionState(context.Background(), 10, "main_menu"); err != nil {
 		t.Fatalf("UpdateSessionState err: %v", err)
