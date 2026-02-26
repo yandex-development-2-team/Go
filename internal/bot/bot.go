@@ -10,7 +10,7 @@ import (
 )
 
 type TelegramBot struct {
-	api    *tgbotapi.BotAPI
+	Api    *tgbotapi.BotAPI
 	logger *zap.Logger
 }
 
@@ -39,13 +39,13 @@ func NewTelegramBot(token string, logger *zap.Logger) (*TelegramBot, error) {
 	)
 
 	return &TelegramBot{
-		api:    api,
+		Api:    api,
 		logger: logger,
 	}, nil
 }
 
 func (bot *TelegramBot) GetUpdates(ctx context.Context, timeout time.Duration) (tgbotapi.UpdatesChannel, error) {
-	if bot == nil || bot.api == nil {
+	if bot == nil || bot.Api == nil {
 		return nil, fmt.Errorf("telegram bot api is nil")
 	}
 	if ctx == nil {
@@ -63,11 +63,11 @@ func (bot *TelegramBot) GetUpdates(ctx context.Context, timeout time.Duration) (
 		"my_chat_member",
 	}
 
-	updates := bot.api.GetUpdatesChan(cfg)
+	updates := bot.Api.GetUpdatesChan(cfg)
 
 	go func() {
 		<-ctx.Done()
-		bot.api.StopReceivingUpdates()
+		bot.Api.StopReceivingUpdates()
 	}()
 
 	return updates, nil
