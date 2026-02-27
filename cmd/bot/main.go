@@ -6,11 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/yandex-development-2-team/Go/internal/bot"
 	"github.com/yandex-development-2-team/Go/internal/config"
 	"github.com/yandex-development-2-team/Go/internal/database"
 	"github.com/yandex-development-2-team/Go/internal/logger"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"github.com/yandex-development-2-team/Go/internal/shutdown"
 	"go.uber.org/zap"
 )
@@ -40,6 +42,8 @@ func main() {
 		log.Fatal("failed_to_ping_db", zap.Error(err))
 	}
 
+	sqlxDB := sqlx.NewDb(db, "postgres")
+
 	if err := database.RunMigrations(db); err != nil {
 		log.Fatal("failed_to_run_migrations", zap.Error(err))
 	}
@@ -48,6 +52,13 @@ func main() {
 	if err != nil {
 		log.Fatal("failed_to_init_bot", zap.Error(err))
 	}
+
+	httpSrv := metrics.NewServer(cfg.Server.PrometheusPort, sqlxDB, tg, log)
+	go func() {
+		if err := httpSrv.Start(); err != nil {
+			log.Fatal("failed_to_start_http_server", zap.Error(err))
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -60,7 +71,12 @@ func main() {
 	// graceful shutdown: по SIGINT/SIGTERM отменяем контекст
 	sh := shutdown.NewShutdownHandler(log)
 	go func() {
-		if err := sh.WaitForShutdown(ctx, cancel); err != nil {
+		if err := sh.WaitForShutdown(ctx, cancel,
+			shutdown.ShutdownTask{
+				Name: "http_server",
+				Fn:   httpSrv.Shutdown,
+			},
+		); err != nil {
 			log.Error("Graceful shutdown completed with errors", zap.Error(err))
 		}
 	}()
