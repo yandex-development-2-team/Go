@@ -48,5 +48,6 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	s.logger.Info("http_metrics_server_shutdown")
 	return s.srv.Shutdown(ctx)
 }
