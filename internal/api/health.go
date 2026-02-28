@@ -77,6 +77,9 @@ func (c *telegramCache) set(status string, latency time.Duration) {
 
 // NewHealthHandler creates a new health handler
 func NewHealthHandler(db *sqlx.DB, telegram TelegramChecker, logger *zap.Logger) http.HandlerFunc {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	h := &HealthHandler{
 		db:             db,
 		telegram:       telegram,
