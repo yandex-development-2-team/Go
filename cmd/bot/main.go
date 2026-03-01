@@ -11,6 +11,8 @@ import (
 	"github.com/yandex-development-2-team/Go/internal/bot"
 	"github.com/yandex-development-2-team/Go/internal/config"
 	"github.com/yandex-development-2-team/Go/internal/database"
+	"github.com/yandex-development-2-team/Go/internal/database/repository"
+	"github.com/yandex-development-2-team/Go/internal/handlers"
 	"github.com/yandex-development-2-team/Go/internal/logger"
 	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"github.com/yandex-development-2-team/Go/internal/shutdown"
@@ -48,6 +50,10 @@ func main() {
 		log.Fatal("failed_to_run_migrations", zap.Error(err))
 	}
 
+	// Используем существующий UserRepository через адаптер
+	dbAdapter := repository.NewDBAdapter(db)
+	userRepo := repository.NewUserRepository(dbAdapter, log)
+
 	tg, err := bot.NewTelegramBot(cfg.Telegram.BotToken, log)
 	if err != nil {
 		log.Fatal("failed_to_init_bot", zap.Error(err))
@@ -81,7 +87,34 @@ func main() {
 		}
 	}()
 
-	for range updates {
-		// обработчики добавятся позже; важно лишь, что polling работает и не падает
+	for update := range updates {
+		if update.Message != nil && update.Message.IsCommand() && update.Message.Command() == "start" {
+			user := update.Message.From
+
+			// Сохраняем пользователя через существующий репозиторий
+			_, err := userRepo.CreateUser(
+				ctx,
+				user.ID,
+				user.UserName,
+				user.FirstName,
+				user.LastName,
+			)
+			if err != nil {
+				log.Warn("failed_to_save_user",
+					zap.Int64("user_id", user.ID),
+					zap.Error(err),
+				)
+			}
+
+			// 2. Вызываем хендлер
+			if err := handlers.HandleStart(tg.Api, update.Message, log); err != nil {
+				log.Error("handle_start_failed",
+					zap.Int64("user_id", user.ID),
+					zap.Error(err),
+				)
+			}
+
+			continue
+		}
 	}
 }
