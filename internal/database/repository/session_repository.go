@@ -85,7 +85,7 @@ func (r *SessionRepository) SaveSession(ctx context.Context, userID int64, state
 		)
 	}
 
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
 		r.logger.Error("save_session_failed", zap.Error(err), zap.Int64("user_id", userID))
 		return fmt.Errorf("save session: %w", err)
@@ -183,7 +183,7 @@ func (r *SessionRepository) ClearSession(ctx context.Context, userID int64) erro
 			zap.Float64("duration_seconds", dur),
 		)
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
 		return fmt.Errorf("clear session: %w", err)
 	}
@@ -215,7 +215,7 @@ func (r *SessionRepository) UpdateSessionState(ctx context.Context, userID int64
 			zap.Float64("duration_seconds", dur),
 		)
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
 		return fmt.Errorf("update session state: %w", err)
 	}

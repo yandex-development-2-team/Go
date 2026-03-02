@@ -23,6 +23,9 @@ type UserRepository struct {
 }
 
 func NewUserRepository(db DatabaseInterface, logger *zap.Logger) *UserRepository {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	return &UserRepository{
 		db:     db,
 		logger: logger,
@@ -62,7 +65,13 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 	op = "create"
 	ctxQ, cancel = context.WithTimeout(ctx, dbQueryTimeout)
 	start = time.Now()
-	res, err := u.db.ExecContext(ctxQ, "INSERT INTO users (telegram_id, username, first_name, last_name) VALUES ($1, $2, $3, $4)", telegramID, username, firstName, lastName)
+	var userID int64
+	err = u.db.GetContext(
+		ctxQ,
+		&userID,
+		"INSERT INTO users (telegram_id, username, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id",
+		telegramID, username, firstName, lastName,
+	)
 	dur = time.Since(start).Seconds()
 	cancel()
 
@@ -73,23 +82,10 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 	}
 	if err != nil {
 		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
-		u.logger.Error("error creating a user")
+		u.logger.Error("error creating a user", zap.Error(err))
 		return nil, err
 	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		u.logger.Error("failed to get rows affected", zap.Error(err))
-		return nil, err
-	}
-	if rowsAffected == 0 {
-		u.logger.Error("no user created")
-		return nil, errors.New("no user created")
-	}
-	userID, err := res.LastInsertId()
-	if err != nil {
-		u.logger.Error("failed to get last inserted id", zap.Error(err))
-		return nil, err
-	}
+
 	op = "read"
 	ctxQ, cancel = context.WithTimeout(ctx, dbQueryTimeout)
 	start = time.Now()
