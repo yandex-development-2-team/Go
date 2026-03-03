@@ -74,13 +74,13 @@ func (bot *TelegramBot) GetUpdates(ctx context.Context, timeout time.Duration) (
 }
 
 func (bot *TelegramBot) Ping(ctx context.Context) error {
-	if bot == nil || bot.api == nil {
+	if bot == nil || bot.Api == nil {
 		return fmt.Errorf("telegram bot api is nil")
 	}
 
 	errCh := make(chan error, 1)
 	go func() {
-		_, err := bot.api.GetMe()
+		_, err := bot.Api.GetMe()
 		errCh <- err
 	}()
 
