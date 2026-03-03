@@ -3,13 +3,13 @@ package models
 import "time"
 
 type User struct {
-	ID         int64
-	TelegramID int64
-	Username   string
-	FirstName  string
-	LastName   string
-	Grade      int
-	IsAdmin    bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID         int64     `db:"id"`
+	TelegramID int64     `db:"telegram_id"`
+	Username   string    `db:"username"`
+	FirstName  string    `db:"first_name"`
+	LastName   string    `db:"last_name"`
+	Grade      int       `db:"grade"`
+	IsAdmin    bool      `db:"is_admin"`
+	CreatedAt  time.Time `db:"created_at"`
+	UpdatedAt  time.Time `db:"updated_at"`
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"go.uber.org/zap"
 
 	"github.com/yandex-development-2-team/Go/internal/models"
@@ -66,8 +67,26 @@ func (r *SessionRepository) SaveSession(ctx context.Context, userID int64, state
 		return fmt.Errorf("marshal state_data: %w", err)
 	}
 
-	_, err = r.db.ExecContext(ctx, saveSessionQuery, userID, state, string(raw))
+	op := "update"
+	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
+	defer cancel()
+
+	start := time.Now()
+	_, err = r.db.ExecContext(ctxQ, saveSessionQuery, userID, state, string(raw))
+	dur := time.Since(start).Seconds()
+
+	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
+	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+
+	if dur > slowQueryThreshold.Seconds() {
+		r.logger.Warn("slow_db_query",
+			zap.String("operation", op),
+			zap.Float64("duration_seconds", dur),
+		)
+	}
+
 	if err != nil {
+		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
 		r.logger.Error("save_session_failed", zap.Error(err), zap.Int64("user_id", userID))
 		return fmt.Errorf("save session: %w", err)
 	}
@@ -90,7 +109,12 @@ func (r *SessionRepository) GetSession(ctx context.Context, userID int64) (*mode
 		updated time.Time
 	)
 
-	err := r.db.QueryRowxContext(ctx, getSessionQuery, userID).Scan(
+	op := "read"
+	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
+	defer cancel()
+
+	start := time.Now()
+	err := r.db.QueryRowxContext(ctxQ, getSessionQuery, userID).Scan(
 		&s.ID,
 		&s.UserID,
 		&s.CurrentState,
@@ -98,10 +122,23 @@ func (r *SessionRepository) GetSession(ctx context.Context, userID int64) (*mode
 		&created,
 		&updated,
 	)
+	dur := time.Since(start).Seconds()
+
+	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
+	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+
+	if dur > slowQueryThreshold.Seconds() {
+		r.logger.Warn("slow_db_query",
+			zap.String("operation", op),
+			zap.Float64("duration_seconds", dur),
+		)
+	}
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
+		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
@@ -129,8 +166,25 @@ func (r *SessionRepository) ClearSession(ctx context.Context, userID int64) erro
 		return fmt.Errorf("invalid userID")
 	}
 
-	_, err := r.db.ExecContext(ctx, clearSessionQuery, userID)
+	op := "delete"
+	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
+	defer cancel()
+
+	start := time.Now()
+	_, err := r.db.ExecContext(ctxQ, clearSessionQuery, userID)
+	dur := time.Since(start).Seconds()
+
+	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
+	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+
+	if dur > slowQueryThreshold.Seconds() {
+		r.logger.Warn("slow_db_query",
+			zap.String("operation", op),
+			zap.Float64("duration_seconds", dur),
+		)
+	}
 	if err != nil {
+		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
 		return fmt.Errorf("clear session: %w", err)
 	}
 	return nil
@@ -144,8 +198,25 @@ func (r *SessionRepository) UpdateSessionState(ctx context.Context, userID int64
 		return fmt.Errorf("invalid userID")
 	}
 
-	_, err := r.db.ExecContext(ctx, updateSessionStateQuery, userID, newState)
+	op := "update"
+	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
+	defer cancel()
+
+	start := time.Now()
+	_, err := r.db.ExecContext(ctxQ, updateSessionStateQuery, userID, newState)
+	dur := time.Since(start).Seconds()
+
+	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
+	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+
+	if dur > slowQueryThreshold.Seconds() {
+		r.logger.Warn("slow_db_query",
+			zap.String("operation", op),
+			zap.Float64("duration_seconds", dur),
+		)
+	}
 	if err != nil {
+		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
 		return fmt.Errorf("update session state: %w", err)
 	}
 	return nil
