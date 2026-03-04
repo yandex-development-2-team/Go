@@ -5,6 +5,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var Default *Metrics
+
 // Metrics хранит все кастомные метрики приложения
 type Metrics struct {
 	// Сообщения от бота
@@ -14,8 +16,9 @@ type Metrics struct {
 	MessageProcessingDuration prometheus.Histogram
 
 	// База данных
-	DatabaseQueriesTotal  prometheus.Counter
-	DatabaseQueryDuration prometheus.Histogram
+	DatabaseQueriesTotal  *prometheus.CounterVec
+	DatabaseErrorsTotal   *prometheus.CounterVec
+	DatabaseQueryDuration *prometheus.HistogramVec
 
 	// Telegram API
 	APIRequestsTotal prometheus.Counter
@@ -70,20 +73,27 @@ func NewMetrics(logger *zap.Logger) (*Metrics, error) {
 		Buckets:   prometheus.DefBuckets,
 	})
 
-	// Counter: всего запросов к БД
-	m.DatabaseQueriesTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	// CounterVec: всего запросов к БД
+	m.DatabaseQueriesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "bot",
 		Name:      "database_queries_total",
 		Help:      "Total number of database queries",
-	})
+	}, []string{"operation"})
 
-	// Histogram: время запросов к БД
-	m.DatabaseQueryDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
+	// CounterVec: ошибки БД
+	m.DatabaseErrorsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "bot",
+		Name:      "database_errors_total",
+		Help:      "Total number of database errors",
+	}, []string{"operation"})
+
+	// HistogramVec: время запросов к БД
+	m.DatabaseQueryDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "bot",
 		Name:      "database_query_duration_seconds",
 		Help:      "Time spent on database queries in seconds",
 		Buckets:   prometheus.DefBuckets,
-	})
+	}, []string{"operation"})
 
 	// Counter: запросы к Telegram API
 	m.APIRequestsTotal = prometheus.NewCounter(prometheus.CounterOpts{
@@ -113,6 +123,7 @@ func NewMetrics(logger *zap.Logger) (*Metrics, error) {
 		m.MessagesErrorsTotal,
 		m.MessageProcessingDuration,
 		m.DatabaseQueriesTotal,
+		m.DatabaseErrorsTotal,
 		m.DatabaseQueryDuration,
 		m.APIRequestsTotal,
 		m.ActiveUsers,
@@ -125,41 +136,11 @@ func NewMetrics(logger *zap.Logger) (*Metrics, error) {
 		}
 	}
 
+	Default = m
 	return m, nil
 }
 
 // Collector возвращает registry для интеграции с сервером
 func (m *Metrics) Collector() *prometheus.Registry {
 	return m.registry
-import "github.com/prometheus/client_golang/prometheus"
-
-var (
-	DBQueriesTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "bot_database_queries_total",
-			Help: "Total database queries",
-		},
-		[]string{"operation"},
-	)
-
-	DBErrorsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "bot_database_errors_total",
-			Help: "Total database errors",
-		},
-		[]string{"operation"},
-	)
-
-	DBQueryDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "bot_database_query_duration_seconds",
-			Help:    "Database query duration in seconds",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"operation"},
-	)
-)
-
-func init() {
-	prometheus.MustRegister(DBQueriesTotal, DBErrorsTotal, DBQueryDuration)
 }

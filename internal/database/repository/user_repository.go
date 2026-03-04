@@ -46,8 +46,8 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 	dur := time.Since(start).Seconds()
 	cancel()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 	if dur > slowQueryThreshold.Seconds() {
 		u.logger.Warn("slow_db_query", zap.String("operation", op), zap.Float64("duration_seconds", dur))
 	}
@@ -57,7 +57,7 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 		return &user, nil
 	}
 	if err != sql.ErrNoRows {
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		u.logger.Error("query error", zap.Error(err))
 		return nil, err
 	}
@@ -75,13 +75,13 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 	dur = time.Since(start).Seconds()
 	cancel()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 	if dur > slowQueryThreshold.Seconds() {
 		u.logger.Warn("slow_db_query", zap.String("operation", op), zap.Float64("duration_seconds", dur))
 	}
 	if err != nil {
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		u.logger.Error("error creating a user", zap.Error(err))
 		return nil, err
 	}
@@ -93,13 +93,13 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 	dur = time.Since(start).Seconds()
 	cancel()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 	if dur > slowQueryThreshold.Seconds() {
 		u.logger.Warn("slow_db_query", zap.String("operation", op), zap.Float64("duration_seconds", dur))
 	}
 	if err != nil && err != sql.ErrNoRows {
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 	}
 
 	u.logger.Info("user created", zap.Int64("telegram_id", telegramID))
@@ -119,8 +119,8 @@ func (u *UserRepository) GetUserByTelegramID(ctx context.Context, telegramID int
 	dur := time.Since(start).Seconds()
 	cancel()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 	if dur > slowQueryThreshold.Seconds() {
 		u.logger.Warn("slow_db_query", zap.String("operation", op), zap.Float64("duration_seconds", dur))
 	}
@@ -130,7 +130,7 @@ func (u *UserRepository) GetUserByTelegramID(ctx context.Context, telegramID int
 			u.logger.Error("context cancelled")
 			return nil, err
 		}
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		u.logger.Error("query error", zap.Error(err))
 		return nil, err
 	}
@@ -150,13 +150,13 @@ func (u *UserRepository) UpdateUserGrade(ctx context.Context, telegramID int64, 
 	dur := time.Since(start).Seconds()
 	cancel()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 	if dur > slowQueryThreshold.Seconds() {
 		u.logger.Warn("slow_db_query", zap.String("operation", op), zap.Float64("duration_seconds", dur))
 	}
 	if err != nil {
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		u.logger.Error("query error", zap.Error(err))
 		return err
 	}
@@ -186,8 +186,8 @@ func (u *UserRepository) IsAdmin(ctx context.Context, telegramID int64) (bool, e
 	dur := time.Since(start).Seconds()
 	cancel()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 	if dur > slowQueryThreshold.Seconds() {
 		u.logger.Warn("slow_db_query", zap.String("operation", op), zap.Float64("duration_seconds", dur))
 	}
@@ -197,7 +197,7 @@ func (u *UserRepository) IsAdmin(ctx context.Context, telegramID int64) (bool, e
 			u.logger.Error("no user found")
 			return false, err
 		}
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		u.logger.Error("query error", zap.Error(err))
 		return false, err
 	}
