@@ -34,6 +34,11 @@ func main() {
 	log := logger.NewLogger(env)
 	defer func() { _ = log.Sync() }()
 
+	m, err := metrics.NewMetrics(log)
+	if err != nil {
+		log.Fatal("failed_to_init_metrics", zap.Error(err))
+	}
+
 	db, err := sql.Open("postgres", cfg.Database.PostgresURL)
 	if err != nil {
 		log.Fatal("failed_to_open_db", zap.Error(err))
@@ -59,7 +64,7 @@ func main() {
 		log.Fatal("failed_to_init_bot", zap.Error(err))
 	}
 
-	httpSrv := metrics.NewServer(cfg.Server.PrometheusPort, sqlxDB, tg, log)
+	httpSrv := metrics.NewServer(cfg.Server.PrometheusPort, sqlxDB, tg, m, log)
 	go func() {
 		if err := httpSrv.Start(); err != nil {
 			log.Fatal("failed_to_start_http_server", zap.Error(err))

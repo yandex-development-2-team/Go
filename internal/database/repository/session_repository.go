@@ -75,8 +75,8 @@ func (r *SessionRepository) SaveSession(ctx context.Context, userID int64, state
 	_, err = r.db.ExecContext(ctxQ, saveSessionQuery, userID, state, string(raw))
 	dur := time.Since(start).Seconds()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 
 	if dur > slowQueryThreshold.Seconds() {
 		r.logger.Warn("slow_db_query",
@@ -86,7 +86,7 @@ func (r *SessionRepository) SaveSession(ctx context.Context, userID int64, state
 	}
 
 	if err != nil {
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		r.logger.Error("save_session_failed", zap.Error(err), zap.Int64("user_id", userID))
 		return fmt.Errorf("save session: %w", err)
 	}
@@ -124,8 +124,8 @@ func (r *SessionRepository) GetSession(ctx context.Context, userID int64) (*mode
 	)
 	dur := time.Since(start).Seconds()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 
 	if dur > slowQueryThreshold.Seconds() {
 		r.logger.Warn("slow_db_query",
@@ -138,7 +138,7 @@ func (r *SessionRepository) GetSession(ctx context.Context, userID int64) (*mode
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
@@ -174,8 +174,8 @@ func (r *SessionRepository) ClearSession(ctx context.Context, userID int64) erro
 	_, err := r.db.ExecContext(ctxQ, clearSessionQuery, userID)
 	dur := time.Since(start).Seconds()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 
 	if dur > slowQueryThreshold.Seconds() {
 		r.logger.Warn("slow_db_query",
@@ -184,7 +184,7 @@ func (r *SessionRepository) ClearSession(ctx context.Context, userID int64) erro
 		)
 	}
 	if err != nil {
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		return fmt.Errorf("clear session: %w", err)
 	}
 	return nil
@@ -206,8 +206,8 @@ func (r *SessionRepository) UpdateSessionState(ctx context.Context, userID int64
 	_, err := r.db.ExecContext(ctxQ, updateSessionStateQuery, userID, newState)
 	dur := time.Since(start).Seconds()
 
-	metrics.DBQueriesTotal.WithLabelValues(op).Inc()
-	metrics.DBQueryDuration.WithLabelValues(op).Observe(dur)
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
 
 	if dur > slowQueryThreshold.Seconds() {
 		r.logger.Warn("slow_db_query",
@@ -216,7 +216,7 @@ func (r *SessionRepository) UpdateSessionState(ctx context.Context, userID int64
 		)
 	}
 	if err != nil {
-		metrics.DBErrorsTotal.WithLabelValues(op).Inc()
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		return fmt.Errorf("update session state: %w", err)
 	}
 	return nil
