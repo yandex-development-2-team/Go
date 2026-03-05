@@ -6,11 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/yandex-development-2-team/Go/internal/bot"
 	"github.com/yandex-development-2-team/Go/internal/config"
 	"github.com/yandex-development-2-team/Go/internal/database"
+	"github.com/yandex-development-2-team/Go/internal/database/repository"
+	"github.com/yandex-development-2-team/Go/internal/handlers"
 	"github.com/yandex-development-2-team/Go/internal/logger"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"github.com/yandex-development-2-team/Go/internal/shutdown"
 	"go.uber.org/zap"
 )
@@ -30,6 +34,11 @@ func main() {
 	log := logger.NewLogger(env)
 	defer func() { _ = log.Sync() }()
 
+	m, err := metrics.NewMetrics(log)
+	if err != nil {
+		log.Fatal("failed_to_init_metrics", zap.Error(err))
+	}
+
 	db, err := sql.Open("postgres", cfg.Database.PostgresURL)
 	if err != nil {
 		log.Fatal("failed_to_open_db", zap.Error(err))
@@ -40,14 +49,27 @@ func main() {
 		log.Fatal("failed_to_ping_db", zap.Error(err))
 	}
 
+	sqlxDB := sqlx.NewDb(db, "postgres")
+
 	if err := database.RunMigrations(db); err != nil {
 		log.Fatal("failed_to_run_migrations", zap.Error(err))
 	}
+
+	// Используем существующий UserRepository через адаптер
+	dbAdapter := repository.NewDBAdapter(db)
+	userRepo := repository.NewUserRepository(dbAdapter, log)
 
 	tg, err := bot.NewTelegramBot(cfg.Telegram.BotToken, log)
 	if err != nil {
 		log.Fatal("failed_to_init_bot", zap.Error(err))
 	}
+
+	httpSrv := metrics.NewServer(cfg.Server.PrometheusPort, sqlxDB, tg, m, log)
+	go func() {
+		if err := httpSrv.Start(); err != nil {
+			log.Fatal("failed_to_start_http_server", zap.Error(err))
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -60,12 +82,44 @@ func main() {
 	// graceful shutdown: по SIGINT/SIGTERM отменяем контекст
 	sh := shutdown.NewShutdownHandler(log)
 	go func() {
-		if err := sh.WaitForShutdown(ctx, cancel); err != nil {
+		if err := sh.WaitForShutdown(ctx, cancel,
+			shutdown.ShutdownTask{
+				Name: "http_server",
+				Fn:   httpSrv.Shutdown,
+			},
+		); err != nil {
 			log.Error("Graceful shutdown completed with errors", zap.Error(err))
 		}
 	}()
 
-	for range updates {
-		// обработчики добавятся позже; важно лишь, что polling работает и не падает
+	for update := range updates {
+		if update.Message != nil && update.Message.IsCommand() && update.Message.Command() == "start" {
+			user := update.Message.From
+
+			// Сохраняем пользователя через существующий репозиторий
+			_, err := userRepo.CreateUser(
+				ctx,
+				user.ID,
+				user.UserName,
+				user.FirstName,
+				user.LastName,
+			)
+			if err != nil {
+				log.Warn("failed_to_save_user",
+					zap.Int64("user_id", user.ID),
+					zap.Error(err),
+				)
+			}
+
+			// 2. Вызываем хендлер
+			if err := handlers.HandleStart(tg.Api, update.Message, log); err != nil {
+				log.Error("handle_start_failed",
+					zap.Int64("user_id", user.ID),
+					zap.Error(err),
+				)
+			}
+
+			continue
+		}
 	}
 }

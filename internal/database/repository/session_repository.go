@@ -1,0 +1,223 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
+	"go.uber.org/zap"
+
+	"github.com/yandex-development-2-team/Go/internal/models"
+)
+
+const (
+	saveSessionQuery = `
+INSERT INTO user_sessions (user_id, current_state, state_data)
+VALUES ($1, $2, $3::jsonb)
+ON CONFLICT (user_id) DO UPDATE SET
+	current_state = EXCLUDED.current_state,
+	state_data = EXCLUDED.state_data,
+	updated_at = CURRENT_TIMESTAMP
+`
+	getSessionQuery = `
+SELECT id, user_id, current_state, state_data, created_at, updated_at
+FROM user_sessions
+WHERE user_id = $1
+`
+	clearSessionQuery = `DELETE FROM user_sessions WHERE user_id = $1`
+
+	updateSessionStateQuery = `
+UPDATE user_sessions
+SET current_state = $2,
+	updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+)
+
+type SessionRepository struct {
+	db     *sqlx.DB
+	logger *zap.Logger
+}
+
+func NewSessionRepository(db *sqlx.DB, logger *zap.Logger) *SessionRepository {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	return &SessionRepository{db: db, logger: logger}
+}
+
+func (r *SessionRepository) SaveSession(ctx context.Context, userID int64, state string, data map[string]interface{}) error {
+	if r.db == nil {
+		return fmt.Errorf("db is nil")
+	}
+	if userID <= 0 {
+		return fmt.Errorf("invalid userID")
+	}
+	if data == nil {
+		data = map[string]interface{}{}
+	}
+
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("marshal state_data: %w", err)
+	}
+
+	op := "update"
+	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
+	defer cancel()
+
+	start := time.Now()
+	_, err = r.db.ExecContext(ctxQ, saveSessionQuery, userID, state, string(raw))
+	dur := time.Since(start).Seconds()
+
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
+
+	if dur > slowQueryThreshold.Seconds() {
+		r.logger.Warn("slow_db_query",
+			zap.String("operation", op),
+			zap.Float64("duration_seconds", dur),
+		)
+	}
+
+	if err != nil {
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
+		r.logger.Error("save_session_failed", zap.Error(err), zap.Int64("user_id", userID))
+		return fmt.Errorf("save session: %w", err)
+	}
+
+	return nil
+}
+
+func (r *SessionRepository) GetSession(ctx context.Context, userID int64) (*models.UserSession, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("db is nil")
+	}
+	if userID <= 0 {
+		return nil, fmt.Errorf("invalid userID")
+	}
+
+	var (
+		s       models.UserSession
+		stateJS []byte
+		created time.Time
+		updated time.Time
+	)
+
+	op := "read"
+	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
+	defer cancel()
+
+	start := time.Now()
+	err := r.db.QueryRowxContext(ctxQ, getSessionQuery, userID).Scan(
+		&s.ID,
+		&s.UserID,
+		&s.CurrentState,
+		&stateJS,
+		&created,
+		&updated,
+	)
+	dur := time.Since(start).Seconds()
+
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
+
+	if dur > slowQueryThreshold.Seconds() {
+		r.logger.Warn("slow_db_query",
+			zap.String("operation", op),
+			zap.Float64("duration_seconds", dur),
+		)
+	}
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+
+	s.CreatedAt = created
+	s.UpdatedAt = updated
+
+	if len(stateJS) > 0 {
+		var m map[string]interface{}
+		if err := json.Unmarshal(stateJS, &m); err != nil {
+			return nil, fmt.Errorf("unmarshal state_data: %w", err)
+		}
+		s.StateData = m
+	} else {
+		s.StateData = map[string]interface{}{}
+	}
+
+	return &s, nil
+}
+
+func (r *SessionRepository) ClearSession(ctx context.Context, userID int64) error {
+	if r.db == nil {
+		return fmt.Errorf("db is nil")
+	}
+	if userID <= 0 {
+		return fmt.Errorf("invalid userID")
+	}
+
+	op := "delete"
+	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
+	defer cancel()
+
+	start := time.Now()
+	_, err := r.db.ExecContext(ctxQ, clearSessionQuery, userID)
+	dur := time.Since(start).Seconds()
+
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
+
+	if dur > slowQueryThreshold.Seconds() {
+		r.logger.Warn("slow_db_query",
+			zap.String("operation", op),
+			zap.Float64("duration_seconds", dur),
+		)
+	}
+	if err != nil {
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
+		return fmt.Errorf("clear session: %w", err)
+	}
+	return nil
+}
+
+func (r *SessionRepository) UpdateSessionState(ctx context.Context, userID int64, newState string) error {
+	if r.db == nil {
+		return fmt.Errorf("db is nil")
+	}
+	if userID <= 0 {
+		return fmt.Errorf("invalid userID")
+	}
+
+	op := "update"
+	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
+	defer cancel()
+
+	start := time.Now()
+	_, err := r.db.ExecContext(ctxQ, updateSessionStateQuery, userID, newState)
+	dur := time.Since(start).Seconds()
+
+	metrics.Default.DatabaseQueriesTotal.WithLabelValues(op).Inc()
+	metrics.Default.DatabaseQueryDuration.WithLabelValues(op).Observe(dur)
+
+	if dur > slowQueryThreshold.Seconds() {
+		r.logger.Warn("slow_db_query",
+			zap.String("operation", op),
+			zap.Float64("duration_seconds", dur),
+		)
+	}
+	if err != nil {
+		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
+		return fmt.Errorf("update session state: %w", err)
+	}
+	return nil
+}
