@@ -85,7 +85,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 				*user = *expectedUser
 				return nil
 			})
-		user, err := repo.CreateUser(ctx, telegramID, username, firstName, lastName)
+		user, err, _ := repo.CreateUser(ctx, telegramID, username, firstName, lastName)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -129,7 +129,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 				*user = *existingUser
 				return nil
 			})
-		user, err := repo.CreateUser(ctx, telegramID, "new_username", "New", "Name")
+		user, err, _ := repo.CreateUser(ctx, telegramID, "new_username", "New", "Name")
 
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -169,7 +169,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 			).
 			Return(nil, expectedErr)
 
-		_, err := repo.CreateUser(ctx, telegramID, "test", "Test", "User")
+		_, err, _ := repo.CreateUser(ctx, telegramID, "test", "Test", "User")
 
 		if err == nil {
 			t.Error("Expected error, got nil")

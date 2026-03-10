@@ -6,9 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"go.uber.org/zap"
 
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"github.com/yandex-development-2-team/Go/internal/models"
 )
 
@@ -32,10 +32,10 @@ func NewUserRepository(db DatabaseInterface, logger *zap.Logger) *UserRepository
 	}
 }
 
-func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, username, firstName, lastName string) (*models.User, error) {
+func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, username, firstName, lastName string) (*models.User, error, bool) {
 	if err := ctx.Err(); err != nil {
 		u.logger.Error("context cancelled before query")
-		return nil, err
+		return nil, err, false
 	}
 	// select user по tg id
 	var user models.User
@@ -54,12 +54,12 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 	// если существует вернуть
 	if err == nil {
 		u.logger.Info("user found", zap.Int64("telegram_id", telegramID))
-		return &user, nil
+		return &user, nil, false
 	}
 	if err != sql.ErrNoRows {
 		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		u.logger.Error("query error", zap.Error(err))
-		return nil, err
+		return nil, err, false
 	}
 	// если не существует создать запись
 	op = "create"
@@ -83,7 +83,7 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 	if err != nil {
 		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		u.logger.Error("error creating a user", zap.Error(err))
-		return nil, err
+		return nil, err, false
 	}
 
 	op = "read"
@@ -103,7 +103,7 @@ func (u *UserRepository) CreateUser(ctx context.Context, telegramID int64, usern
 	}
 
 	u.logger.Info("user created", zap.Int64("telegram_id", telegramID))
-	return &user, nil
+	return &user, nil, true
 }
 
 func (u *UserRepository) GetUserByTelegramID(ctx context.Context, telegramID int64) (*models.User, error) {
@@ -202,4 +202,36 @@ func (u *UserRepository) IsAdmin(ctx context.Context, telegramID int64) (bool, e
 		return false, err
 	}
 	return user.IsAdmin, nil
+}
+
+func (u *UserRepository) UpdateUserUsername(ctx context.Context, telegramID int64, newUsername string) error {
+	if err := ctx.Err(); err != nil {
+		u.logger.Error("context cancelled before query")
+		return err
+	}
+
+	result, err := u.db.ExecContext(ctx,
+		"UPDATE users SET username = $1, updated_at = NOW() WHERE telegram_id = $2",
+		newUsername, telegramID)
+
+	if err != nil {
+		u.logger.Error("failed to update username", zap.Error(err))
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		u.logger.Error("failed to get rows affected", zap.Error(err))
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	u.logger.Info("username updated",
+		zap.Int64("telegram_id", telegramID),
+		zap.String("new_username", newUsername))
+
+	return nil
 }
