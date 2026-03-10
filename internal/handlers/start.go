@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"fmt"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"go.uber.org/zap"
 )
 
@@ -13,6 +15,25 @@ func HandleStart(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, logger *zap.Logger
 	if msg == nil || msg.From == nil {
 		return fmt.Errorf("invalid message from user")
 	}
+
+	start := time.Now()
+	// ActiveUsers: считаем “активных” как количество одновременно обрабатываемых запросов
+	metrics.Default.ActiveUsers.Inc()
+	defer metrics.Default.ActiveUsers.Dec()
+
+	metrics.Default.MessagesReceived.Inc()
+
+	var handlerErr error
+	defer func() {
+		dur := time.Since(start).Seconds()
+		metrics.Default.MessageProcessingDuration.Observe(dur)
+
+		logger.Info("handle_start_metrics",
+			zap.Int64("user_id", msg.From.ID),
+			zap.Float64("duration_seconds", dur),
+			zap.Bool("success", handlerErr == nil),
+		)
+	}()
 
 	user := msg.From
 
@@ -45,6 +66,9 @@ func HandleStart(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, logger *zap.Logger
 
 	//обрабатываем ошибку отправки
 	if _, err := bot.Send(message); err != nil {
+		handlerErr = err
+		metrics.Default.MessagesErrorsTotal.Inc()
+
 		logger.Error("failed to send message",
 			zap.Int64("user_id", user.ID),
 			zap.Int64("chat_id", msg.Chat.ID),
