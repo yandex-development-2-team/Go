@@ -27,6 +27,10 @@ type Metrics struct {
 	ActiveUsers   prometheus.Gauge
 	BookingsTotal prometheus.Counter
 
+	// Callback queries
+	CallbacksReceived           prometheus.Counter
+	CallbacksProcessingDuration prometheus.Histogram
+
 	registry *prometheus.Registry
 	logger   *zap.Logger
 }
@@ -116,6 +120,19 @@ func NewMetrics(logger *zap.Logger) (*Metrics, error) {
 		Help:      "Total number of bookings made",
 	})
 
+	m.CallbacksReceived = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "bot",
+		Name:      "callbacks_received_total",
+		Help:      "Total number of callback queries received",
+	})
+
+	m.CallbacksProcessingDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: "bot",
+		Name:      "callbacks_processing_duration_seconds",
+		Help:      "Time spent processing callbacks queries in seconds",
+		Buckets:   prometheus.DefBuckets,
+	})
+
 	// Регистрируем все метрики
 	collectors := []prometheus.Collector{
 		m.MessagesReceived,
@@ -128,6 +145,8 @@ func NewMetrics(logger *zap.Logger) (*Metrics, error) {
 		m.APIRequestsTotal,
 		m.ActiveUsers,
 		m.BookingsTotal,
+		m.CallbacksReceived,
+		m.CallbacksProcessingDuration,
 	}
 
 	for _, collector := range collectors {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 
 	"go.uber.org/zap"
 )
@@ -21,8 +22,25 @@ type CallbackHandler interface {
 
 func HandleCallback(router *CallbackRouter, query *tgbotapi.CallbackQuery) error {
 	start := time.Now()
+
+	metrics.Default.ActiveUsers.Inc()
+	defer metrics.Default.ActiveUsers.Dec()
+
+	metrics.Default.CallbacksReceived.Inc()
 	// Получаем и находим нужный handler в карте handlers
 	button := query.Data
+
+	var handlerErr error
+	defer func() {
+		dur := time.Since(start).Seconds()
+		metrics.Default.CallbacksProcessingDuration.Observe(dur)
+
+		router.logger.Info("handle_callback_metrics",
+			zap.String("button", button),
+			zap.Float64("duration_seconds", dur),
+			zap.Bool("success", handlerErr == nil),
+		)
+	}()
 
 	handler, ok := router.handlers[button]
 	if !ok {
@@ -38,14 +56,17 @@ func HandleCallback(router *CallbackRouter, query *tgbotapi.CallbackQuery) error
 	defer cancel()
 	err := handler.Handle(ctx, query)
 	if err != nil {
+		handlerErr = err
+		metrics.Default.MessagesErrorsTotal.Inc()
 		return err
 	}
 	/* //когда будет bot
 	_, err = bot.AnswerCallbackQuery(tgbotapi.CallbackQueryID{CallbackQueryID: query.ID, Text: "Вы нажали " + button})
 	*/
-	end := time.Now()
-	elapsed := end.Sub(start)
-	router.logger.Info("Нажата кнопка "+button, zap.String("user_id", query.ID), zap.String("callback_data", button), zap.Duration("время обработки", elapsed))
+	router.logger.Info("callback handled",
+		zap.String("button", button),
+		zap.String("callback_id", query.ID),
+	)
 	return err
 
 }
