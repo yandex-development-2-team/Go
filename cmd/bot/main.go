@@ -6,8 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+
 	"github.com/yandex-development-2-team/Go/internal/bot"
 	"github.com/yandex-development-2-team/Go/internal/config"
 	"github.com/yandex-development-2-team/Go/internal/database"
@@ -16,7 +19,6 @@ import (
 	"github.com/yandex-development-2-team/Go/internal/logger"
 	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"github.com/yandex-development-2-team/Go/internal/shutdown"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -97,7 +99,7 @@ func main() {
 			user := update.Message.From
 
 			// Сохраняем пользователя через существующий репозиторий
-			_, err := userRepo.CreateUser(
+			_, err, _ := userRepo.CreateUser(
 				ctx,
 				user.ID,
 				user.UserName,
@@ -112,7 +114,7 @@ func main() {
 			}
 
 			// 2. Вызываем хендлер
-			if err := handlers.HandleStart(tg.Api, update.Message, log); err != nil {
+			if err := handlers.HandleStart(tg.Api, update.Message, log, db); err != nil {
 				log.Error("handle_start_failed",
 					zap.Int64("user_id", user.ID),
 					zap.Error(err),

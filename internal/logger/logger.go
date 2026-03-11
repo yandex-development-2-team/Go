@@ -15,11 +15,11 @@ func NewLogger(env string) *zap.Logger {
 	if env == "development" {
 		logger, err = zap.NewDevelopment()
 		defer logger.Sync()
-	} 
+	}
 	if env == "production" {
 		logger, err = zap.NewProduction()
 		defer logger.Sync()
-	} 
+	}
 
 	if err != nil {
 		panic(fmt.Sprintf("Ошибка при инициализации логгеров:%v", err))
