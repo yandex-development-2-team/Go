@@ -57,6 +57,10 @@ func main() {
 		log.Fatal("failed_to_run_migrations", zap.Error(err))
 	}
 
+	if err := database.EnsureDefaultSettings(context.Background(), sqlxDB); err != nil {
+		log.Fatal("failed_to_ensure_settings", zap.Error(err))
+	}
+
 	// Используем существующий UserRepository через адаптер
 	dbAdapter := repository.NewDBAdapter(db)
 	userRepo := repository.NewUserRepository(dbAdapter, log)
