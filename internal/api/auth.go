@@ -39,7 +39,8 @@ type RefreshRequest struct {
 }
 
 type RefreshResponse struct {
-	Token string `json:"token"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type LogoutRequest struct {
@@ -208,7 +209,10 @@ func (h *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := RefreshResponse{Token: token}
+	resp := RefreshResponse{
+		Token:        token,
+		RefreshToken: newRefresh,
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(resp)
