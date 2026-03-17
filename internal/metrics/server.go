@@ -1,4 +1,4 @@
-package metrics
+package httpserver
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/yandex-development-2-team/Go/internal/api"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"go.uber.org/zap"
 )
 
@@ -18,12 +19,18 @@ type Server struct {
 	logger *zap.Logger
 }
 
-func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *Metrics, logger *zap.Logger, applicationsHandler http.Handler) *Server {
+func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *metrics.Metrics, authCfg api.AuthConfig, logger *zap.Logger, applicationsHandler http.Handler) *Server {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
 	mux := http.NewServeMux()
+
+	authHandlers := api.NewAuthHandlers(db, authCfg, logger)
+
+	mux.HandleFunc("/api/v1/auth/register", authHandlers.Register)
+	mux.HandleFunc("/api/v1/auth/refresh", authHandlers.Refresh)
+	mux.HandleFunc("/api/v1/auth/logout", authHandlers.Logout)
 
 	mux.HandleFunc("/health", api.NewHealthHandler(db, telegram, logger))
 
