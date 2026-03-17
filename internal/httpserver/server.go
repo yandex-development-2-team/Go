@@ -36,7 +36,8 @@ func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *metrics.M
 
 	mux.Handle("/metrics", promhttp.HandlerFor(m.Collector(), promhttp.HandlerOpts{}))
 
-	mux.HandleFunc("/api/v1/settings", api.NewSettingsHandler(db, logger))
+	settingsHandler := api.NewSettingsHandler(db, logger)
+	mux.HandleFunc("/api/v1/settings", api.RequireAuth(authCfg.JWTSecret, settingsHandler))
 
 	if applicationsHandler != nil {
 		mux.Handle("/api/v1/applications", applicationsHandler)
