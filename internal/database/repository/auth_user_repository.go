@@ -21,7 +21,7 @@ func NewAuthUserRepository(db *sqlx.DB) *AuthUserRepository {
 
 func (r *AuthUserRepository) GetByEmail(ctx context.Context, email string) (*models.AuthUser, error) {
 	var u models.AuthUser
-	err := r.db.GetContext(ctx, &u, "SELECT * FROM auth_user WHERE email = $1", email)
+	err := r.db.GetContext(ctx, &u, "SELECT * FROM auth_users WHERE email = $1", email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, sql.ErrNoRows

@@ -1,23 +1,11 @@
 -- +goose Up
-DO $$ BEGIN
-CREATE TYPE user_role_type AS ENUM ('admin', 'manager');
-EXCEPTION
-  WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-CREATE TYPE user_status_type AS ENUM ('active', 'blocked', 'invited');
-EXCEPTION
-  WHEN duplicate_object THEN null;
-END $$;
-
 CREATE TABLE IF NOT EXISTS auth_users (
-                                          id BIGSERIAL PRIMARY KEY,
-                                          name VARCHAR(100) NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    role user_role_type NOT NULL,
-    status user_status_type NOT NULL DEFAULT 'active',
+    role TEXT NOT NULL CHECK (role IN ('admin', 'manager')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'blocked', 'invited')),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
