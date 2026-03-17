@@ -101,7 +101,7 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "weak password", http.StatusBadRequest)
 		return
 	}
-	if req.Role != "admin" && req.Role != "member" {
+	if req.Role != "admin" && req.Role != "manager" {
 		http.Error(w, "invalid role", http.StatusBadRequest)
 		return
 	}

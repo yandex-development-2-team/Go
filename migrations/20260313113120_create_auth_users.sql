@@ -12,5 +12,3 @@ CREATE TABLE IF NOT EXISTS auth_users (
 
 -- +goose Down
 DROP TABLE IF EXISTS auth_users;
-DROP TYPE IF EXISTS user_role_type;
-DROP TYPE IF EXISTS user_status_type;
