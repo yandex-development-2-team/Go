@@ -9,6 +9,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"go.uber.org/zap"
 )
 
@@ -21,6 +22,9 @@ func newRepo(t *testing.T) (*SessionRepository, sqlmock.Sqlmock, func()) {
 	}
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
+
+	_, _ = metrics.NewMetrics(zap.NewNop())
+
 	repo := NewSessionRepository(sqlxDB, zap.NewNop())
 
 	return repo, mock, func() { _ = db.Close() }
