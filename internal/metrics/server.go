@@ -18,7 +18,7 @@ type Server struct {
 	logger *zap.Logger
 }
 
-func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *Metrics, logger *zap.Logger) *Server {
+func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *Metrics, logger *zap.Logger, applicationsHandler http.Handler) *Server {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -30,6 +30,10 @@ func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *Metrics, 
 	mux.Handle("/metrics", promhttp.HandlerFor(m.Collector(), promhttp.HandlerOpts{}))
 
 	mux.HandleFunc("/api/v1/settings", api.NewSettingsHandler(db, logger))
+
+	if applicationsHandler != nil {
+		mux.Handle("/api/v1/applications", applicationsHandler)
+	}
 
 	s := &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
