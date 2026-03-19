@@ -29,6 +29,8 @@ func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *Metrics, 
 
 	mux.Handle("/metrics", promhttp.HandlerFor(m.Collector(), promhttp.HandlerOpts{}))
 
+	mux.HandleFunc("/api/v1/settings", api.NewSettingsHandler(db, logger))
+
 	s := &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
 		Handler:           mux,
