@@ -31,11 +31,20 @@ type RefreshTokenRow struct {
 }
 
 func (r *RefreshTokenRepository) Insert(ctx context.Context, token string, userID int64, expiresAt time.Time) error {
-	_, err := r.db.ExecContext(ctx, `
+	tx, err := r.db.BeginTxx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.ExecContext(ctx, `
 INSERT INTO refresh_tokens (token, user_id, expires_at)
 VALUES ($1, $2, $3)
 `, token, userID, expiresAt)
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *RefreshTokenRepository) Revoke(ctx context.Context, token string) error {

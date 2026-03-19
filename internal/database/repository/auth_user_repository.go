@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/yandex-development-2-team/Go/internal/models"
 )
 
@@ -32,21 +33,27 @@ func (r *AuthUserRepository) GetByEmail(ctx context.Context, email string) (*mod
 }
 
 func (r *AuthUserRepository) Create(ctx context.Context, name, email, passwordHash, role string) (*models.AuthUser, error) {
-	_, err := r.GetByEmail(ctx, email)
-	if err == nil {
-		return nil, ErrEmailExists
-	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	tx, err := r.db.BeginTxx(ctx, &sql.TxOptions{})
+	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = tx.Rollback() }()
 
 	var u models.AuthUser
-	err = r.db.GetContext(ctx, &u, `
+	err = tx.GetContext(ctx, &u, `
 INSERT INTO auth_users (name, email, password_hash, role, status)
 VALUES ($1, $2, $3, $4, 'active')
 RETURNING id, name, email, role, status, created_at, updated_at
 `, name, email, passwordHash, role)
 	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return nil, ErrEmailExists
+		}
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return &u, nil

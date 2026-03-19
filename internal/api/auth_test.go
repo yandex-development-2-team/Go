@@ -12,6 +12,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"go.uber.org/zap"
 )
 
@@ -37,10 +38,7 @@ func TestRegister_OK(t *testing.T) {
 	h, mock, cleanup := newAuthHandlersForTest(t)
 	defer cleanup()
 
-	// repo.Create -> GetByEmail -> SELECT * FROM auth_users WHERE email = $1 -> no rows
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM auth_users WHERE email = $1`)).
-		WithArgs("admin@example.com").
-		WillReturnError(sql.ErrNoRows)
+	mock.ExpectBegin()
 
 	// INSERT auth_users ... RETURNING ...
 	now := time.Now()
@@ -54,6 +52,9 @@ RETURNING id, name, email, role, status, created_at, updated_at
 			"id", "name", "email", "role", "status", "created_at", "updated_at",
 		}).AddRow(int64(1), "Admin", "admin@example.com", "admin", "active", now, now))
 
+	mock.ExpectCommit()
+
+	mock.ExpectBegin()
 	// refreshTokens.Insert -> Exec INSERT refresh_tokens
 	mock.ExpectExec(regexp.QuoteMeta(`
 INSERT INTO refresh_tokens (token, user_id, expires_at)
@@ -61,6 +62,7 @@ VALUES ($1, $2, $3)
 `)).
 		WithArgs(sqlmock.AnyArg(), int64(1), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	body := []byte(`{"name":"Admin","email":"admin@example.com","password":"password123","role":"admin"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewReader(body))
@@ -92,13 +94,17 @@ func TestRegister_DuplicateEmail_409(t *testing.T) {
 	h, mock, cleanup := newAuthHandlersForTest(t)
 	defer cleanup()
 
-	// SELECT by email returns a row => repo.Create -> ErrEmailExists => 409
-	now := time.Now()
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM auth_users WHERE email = $1`)).
-		WithArgs("admin@example.com").
-		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "name", "email", "password_hash", "role", "status", "created_at", "updated_at",
-		}).AddRow(int64(1), "Admin", "admin@example.com", "hash", "admin", "active", now, now))
+	mock.ExpectBegin()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+INSERT INTO auth_users (name, email, password_hash, role, status)
+VALUES ($1, $2, $3, $4, 'active')
+RETURNING id, name, email, role, status, created_at, updated_at
+`)).
+		WithArgs("Admin", "admin@example.com", sqlmock.AnyArg(), "admin").
+		WillReturnError(&pq.Error{Code: "23505"})
+
+	mock.ExpectRollback()
 
 	body := []byte(`{"name":"Admin","email":"admin@example.com","password":"password123","role":"admin"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewReader(body))
