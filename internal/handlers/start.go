@@ -11,6 +11,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/yandex-development-2-team/Go/internal/database/repository"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 )
 
 const welcomeMessage = "👋 Добро пожаловать в Bot Яндекса!\n\nВыберите интересующую вас опцию:"
