@@ -66,6 +66,7 @@ func main() {
 	// Используем существующий UserRepository через адаптер
 	dbAdapter := repository.NewDBAdapter(db)
 	userRepo := repository.NewUserRepository(dbAdapter, log)
+	applicationRepo := repository.NewApplicationRepository(dbAdapter, log)
 
 	tg, err := bot.NewTelegramBot(cfg.Telegram.BotToken, log)
 	if err != nil {
@@ -76,7 +77,7 @@ func main() {
 		JWTSecret:             cfg.Auth.JWTSecret,
 		AccessTokenTTLMinutes: cfg.Auth.AccessTokenTTLMinutes,
 		RefreshTokenTTLHours:  cfg.Auth.RefreshTokenTTLHours,
-	}, log)
+	}, log, api.NewApplicationsHandler(applicationRepo, log))
 	go func() {
 		if err := httpSrv.Start(); err != nil {
 			log.Fatal("failed_to_start_http_server", zap.Error(err))
