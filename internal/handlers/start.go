@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"go.uber.org/zap"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
