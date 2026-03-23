@@ -6,12 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yandex-development-2-team/Go/internal/api"
+	"github.com/yandex-development-2-team/Go/internal/httpserver"
 	"go.uber.org/zap"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 
-	"github.com/yandex-development-2-team/Go/internal/api"
 	"github.com/yandex-development-2-team/Go/internal/bot"
 	"github.com/yandex-development-2-team/Go/internal/config"
 	"github.com/yandex-development-2-team/Go/internal/database"
@@ -72,14 +73,11 @@ func main() {
 		log.Fatal("failed_to_init_bot", zap.Error(err))
 	}
 
-	httpSrv := metrics.NewServer(
-		cfg.Server.PrometheusPort,
-		sqlxDB,
-		tg,
-		m,
-		log,
-		api.NewApplicationsHandler(applicationRepo, log),
-	)
+	httpSrv := httpserver.NewServer(cfg.Server.PrometheusPort, sqlxDB, tg, m, api.AuthConfig{
+		JWTSecret:             cfg.Auth.JWTSecret,
+		AccessTokenTTLMinutes: cfg.Auth.AccessTokenTTLMinutes,
+		RefreshTokenTTLHours:  cfg.Auth.RefreshTokenTTLHours,
+	}, log, api.NewApplicationsHandler(applicationRepo, log))
 	go func() {
 		if err := httpSrv.Start(); err != nil {
 			log.Fatal("failed_to_start_http_server", zap.Error(err))

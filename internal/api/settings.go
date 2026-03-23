@@ -17,11 +17,12 @@ func NewSettingsHandler(db *sqlx.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
 		var raw struct {
-			Notifications []byte `json:"notifications"`
-			Booking       []byte `json:"booking"`
-			General       []byte `json:"general"`
+			Notifications []byte `db:"notifications"`
+			Booking       []byte `db:"booking"`
+			General       []byte `db:"general"`
 		}
 
 		if err := db.GetContext(r.Context(), &raw, `
