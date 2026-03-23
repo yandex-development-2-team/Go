@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yandex-development-2-team/Go/internal/api"
+	"github.com/yandex-development-2-team/Go/internal/httpserver"
 	"go.uber.org/zap"
 
 	"github.com/jmoiron/sqlx"
@@ -64,13 +66,18 @@ func main() {
 	// Используем существующий UserRepository через адаптер
 	dbAdapter := repository.NewDBAdapter(db)
 	userRepo := repository.NewUserRepository(dbAdapter, log)
+	applicationRepo := repository.NewApplicationRepository(dbAdapter, log)
 
 	tg, err := bot.NewTelegramBot(cfg.Telegram.BotToken, log)
 	if err != nil {
 		log.Fatal("failed_to_init_bot", zap.Error(err))
 	}
 
-	httpSrv := metrics.NewServer(cfg.Server.PrometheusPort, sqlxDB, tg, m, log)
+	httpSrv := httpserver.NewServer(cfg.Server.PrometheusPort, sqlxDB, tg, m, api.AuthConfig{
+		JWTSecret:             cfg.Auth.JWTSecret,
+		AccessTokenTTLMinutes: cfg.Auth.AccessTokenTTLMinutes,
+		RefreshTokenTTLHours:  cfg.Auth.RefreshTokenTTLHours,
+	}, log, api.NewApplicationsHandler(applicationRepo, log))
 	go func() {
 		if err := httpSrv.Start(); err != nil {
 			log.Fatal("failed_to_start_http_server", zap.Error(err))

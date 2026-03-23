@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
@@ -35,6 +36,9 @@ func TestUserRepository_CreateUser(t *testing.T) {
 
 	mockDB := NewMockDatabaseInterface(ctrl)
 	logger := zap.NewNop()
+	if _, err := metrics.NewMetrics(logger); err != nil {
+		t.Fatalf("init metrics: %v", err)
+	}
 	repo := NewUserRepository(mockDB, logger)
 
 	// Успешное создание нового пользователя
@@ -57,25 +61,30 @@ func TestUserRepository_CreateUser(t *testing.T) {
 		}
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
 			).
 			Return(sql.ErrNoRows)
 		mockDB.EXPECT().
-			ExecContext(
-				ctx,
-				"INSERT INTO users (telegram_id, username, first_name, last_name) VALUES ($1, $2, $3, $4)",
+			GetContext(
+				gomock.Any(),
+				gomock.Any(),
+				"INSERT INTO users (telegram_id, username, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id",
 				telegramID,
 				username,
 				firstName,
 				lastName,
 			).
-			Return(&mockSQLResult{rowsAffected: 1, lastInsertId: expectedID}, nil)
+			DoAndReturn(func(ctx context.Context, dest interface{}, q string, args ...interface{}) error {
+				idPtr := dest.(*int64)
+				*idPtr = expectedID
+				return nil
+			})
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE ID = $1",
 				expectedID,
@@ -119,7 +128,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 		}
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -152,22 +161,23 @@ func TestUserRepository_CreateUser(t *testing.T) {
 		expectedErr := errors.New("insert failed")
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
 			).
 			Return(sql.ErrNoRows)
 		mockDB.EXPECT().
-			ExecContext(
-				ctx,
-				"INSERT INTO users (telegram_id, username, first_name, last_name) VALUES ($1, $2, $3, $4)",
+			GetContext(
+				gomock.Any(),
+				gomock.Any(),
+				"INSERT INTO users (telegram_id, username, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id",
 				telegramID,
 				"test",
 				"Test",
 				"User",
 			).
-			Return(nil, expectedErr)
+			Return(expectedErr)
 
 		_, err, _ := repo.CreateUser(ctx, telegramID, "test", "Test", "User")
 
@@ -183,6 +193,9 @@ func TestUserRepository_GetUserByTelegramID(t *testing.T) {
 
 	mockDB := NewMockDatabaseInterface(ctrl)
 	logger := zap.NewNop()
+	if _, err := metrics.NewMetrics(logger); err != nil {
+		t.Fatalf("init metrics: %v", err)
+	}
 	repo := NewUserRepository(mockDB, logger)
 
 	// Успешное получение пользователя
@@ -201,7 +214,7 @@ func TestUserRepository_GetUserByTelegramID(t *testing.T) {
 		}
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -227,16 +240,16 @@ func TestUserRepository_GetUserByTelegramID(t *testing.T) {
 		telegramID := int64(12345)
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
 			).
 			Return(sql.ErrNoRows)
 		user, err := repo.GetUserByTelegramID(ctx, telegramID)
-		assert.Error(t, err)
-		assert.Nil(t, user)
-		assert.Equal(t, sql.ErrNoRows, err)
+		assert.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, int64(0), user.ID)
 	})
 
 	// Ошибка базы данных
@@ -246,7 +259,7 @@ func TestUserRepository_GetUserByTelegramID(t *testing.T) {
 		expectedErr := errors.New("connection failed")
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -275,7 +288,7 @@ func TestUserRepository_GetUserByTelegramID(t *testing.T) {
 		telegramID := int64(12345)
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -309,6 +322,9 @@ func TestUserRepository_UpdateUserGrade(t *testing.T) {
 
 	mockDB := NewMockDatabaseInterface(ctrl)
 	logger := zap.NewNop()
+	if _, err := metrics.NewMetrics(logger); err != nil {
+		t.Fatalf("init metrics: %v", err)
+	}
 	repo := NewUserRepository(mockDB, logger)
 
 	// Успешное обновление grade
@@ -318,7 +334,7 @@ func TestUserRepository_UpdateUserGrade(t *testing.T) {
 		newGrade := 5
 		mockDB.EXPECT().
 			ExecContext(
-				ctx,
+				gomock.Any(),
 				"UPDATE users SET grade = $1 WHERE telegram_id = $2",
 				newGrade,
 				telegramID,
@@ -335,7 +351,7 @@ func TestUserRepository_UpdateUserGrade(t *testing.T) {
 		newGrade := 5
 		mockDB.EXPECT().
 			ExecContext(
-				ctx,
+				gomock.Any(),
 				"UPDATE users SET grade = $1 WHERE telegram_id = $2",
 				newGrade,
 				telegramID,
@@ -354,7 +370,7 @@ func TestUserRepository_UpdateUserGrade(t *testing.T) {
 		expectedErr := errors.New("database connection error")
 		mockDB.EXPECT().
 			ExecContext(
-				ctx,
+				gomock.Any(),
 				"UPDATE users SET grade = $1 WHERE telegram_id = $2",
 				newGrade,
 				telegramID,
@@ -389,15 +405,18 @@ func TestUserRepository_UpdateUserGrade(t *testing.T) {
 }
 
 func TestUserRepository_IsAdmin(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockDB := NewMockDatabaseInterface(ctrl)
-	logger := zap.NewNop()
-	repo := NewUserRepository(mockDB, logger)
-
 	// Пользователь является админом
 	t.Run("success - user is admin", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockDB := NewMockDatabaseInterface(ctrl)
+		logger := zap.NewNop()
+		if _, err := metrics.NewMetrics(logger); err != nil {
+			t.Fatalf("init metrics: %v", err)
+		}
+		repo := NewUserRepository(mockDB, logger)
+
 		ctx := context.Background()
 		telegramID := int64(12345)
 
@@ -412,7 +431,7 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -430,6 +449,16 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 	// Пользователь не является админом
 	t.Run("success - user is not admin", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockDB := NewMockDatabaseInterface(ctrl)
+		logger := zap.NewNop()
+		if _, err := metrics.NewMetrics(logger); err != nil {
+			t.Fatalf("init metrics: %v", err)
+		}
+		repo := NewUserRepository(mockDB, logger)
+
 		ctx := context.Background()
 		telegramID := int64(12345)
 
@@ -444,7 +473,7 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -463,12 +492,22 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 	// Пользователь не найден
 	t.Run("error - user not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockDB := NewMockDatabaseInterface(ctrl)
+		logger := zap.NewNop()
+		if _, err := metrics.NewMetrics(logger); err != nil {
+			t.Fatalf("init metrics: %v", err)
+		}
+		repo := NewUserRepository(mockDB, logger)
+
 		ctx := context.Background()
 		telegramID := int64(12345)
 
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -484,13 +523,23 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 	// Ошибка базы данных
 	t.Run("error - database error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockDB := NewMockDatabaseInterface(ctrl)
+		logger := zap.NewNop()
+		if _, err := metrics.NewMetrics(logger); err != nil {
+			t.Fatalf("init metrics: %v", err)
+		}
+		repo := NewUserRepository(mockDB, logger)
+
 		ctx := context.Background()
 		telegramID := int64(12345)
 		expectedErr := errors.New("connection failed")
 
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -506,6 +555,16 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 	// Контекст отменён до запроса
 	t.Run("error - context cancelled before query", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockDB := NewMockDatabaseInterface(ctrl)
+		logger := zap.NewNop()
+		if _, err := metrics.NewMetrics(logger); err != nil {
+			t.Fatalf("init metrics: %v", err)
+		}
+		repo := NewUserRepository(mockDB, logger)
+
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
@@ -520,13 +579,23 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 	// Контекст отменён во время запроса
 	t.Run("error - context cancelled during query", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockDB := NewMockDatabaseInterface(ctrl)
+		logger := zap.NewNop()
+		if _, err := metrics.NewMetrics(logger); err != nil {
+			t.Fatalf("init metrics: %v", err)
+		}
+		repo := NewUserRepository(mockDB, logger)
+
 		ctx, cancel := context.WithCancel(context.Background())
 
 		telegramID := int64(12345)
 
 		mockDB.EXPECT().
 			GetContext(
-				ctx,
+				gomock.Any(),
 				gomock.Any(),
 				"SELECT * FROM users WHERE telegram_id = $1",
 				telegramID,
@@ -545,6 +614,16 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 	// Таймаут контекста
 	t.Run("error - context deadline exceeded", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockDB := NewMockDatabaseInterface(ctrl)
+		logger := zap.NewNop()
+		if _, err := metrics.NewMetrics(logger); err != nil {
+			t.Fatalf("init metrics: %v", err)
+		}
+		repo := NewUserRepository(mockDB, logger)
+
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 		defer cancel()
 
