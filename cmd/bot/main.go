@@ -66,6 +66,9 @@ func main() {
 	dbAdapter := repository.NewDBAdapter(db)
 	userRepo := repository.NewUserRepository(dbAdapter, log)
 	applicationRepo := repository.NewApplicationRepository(dbAdapter, log)
+	resourceRepo := repository.NewResourceRepository(sqlxDB, log)
+	resourceHandler := api.NewResourcesHandler(resourceRepo, log)
+	publicResourceHandler := api.NewPublicResourcesHandler(resourceRepo, log)
 
 	tg, err := bot.NewTelegramBot(cfg.Telegram.BotToken, log)
 	if err != nil {
@@ -79,6 +82,8 @@ func main() {
 		m,
 		log,
 		api.NewApplicationsHandler(applicationRepo, log),
+		resourceHandler,
+		publicResourceHandler,
 	)
 	go func() {
 		if err := httpSrv.Start(); err != nil {

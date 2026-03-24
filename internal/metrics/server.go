@@ -18,7 +18,7 @@ type Server struct {
 	logger *zap.Logger
 }
 
-func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *Metrics, logger *zap.Logger, applicationsHandler http.Handler) *Server {
+func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *Metrics, logger *zap.Logger, applicationsHandler http.Handler, resourceHandler http.Handler, publicResourcesHandler http.Handler) *Server {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -33,6 +33,14 @@ func NewServer(port int, db *sqlx.DB, telegram api.TelegramChecker, m *Metrics, 
 
 	if applicationsHandler != nil {
 		mux.Handle("/api/v1/applications", applicationsHandler)
+	}
+
+	if resourceHandler != nil {
+		mux.Handle("/api/v1/resources/", resourceHandler)
+	}
+
+	if publicResourcesHandler != nil {
+		mux.Handle("/public/resources/", publicResourcesHandler)
 	}
 
 	s := &http.Server{
