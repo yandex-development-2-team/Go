@@ -158,7 +158,7 @@ func (b *BoxRepository) UpdateStatus(ctx context.Context, id int64, status strin
 	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
 	start := time.Now()
 
-	_, err := b.db.ExecContext(ctxQ, "UPDATE boxes SET status = $1 WHERE id = $2", status, id)
+	_, err := b.db.ExecContext(ctxQ, "UPDATE boxes SET status = $1, updated_at = $2 WHERE id = $3 AND deleted_at IS NULL RETURNING", status, time.Now(), id)
 	dur := time.Since(start).Seconds()
 	cancel()
 
@@ -174,6 +174,11 @@ func (b *BoxRepository) UpdateStatus(ctx context.Context, id int64, status strin
 	err = b.db.GetContext(ctxQ, &box, "SELECT * FROM boxes WHERE id = $1 AND deleted_at IS NULL", id)
 
 	if err != nil {
+		if err == sql.ErrNoRows {
+			metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
+			b.logger.Error("box not found", zap.Error(err))
+			return nil, fmt.Errorf("box with id %d not found", id)
+		}
 		metrics.Default.DatabaseErrorsTotal.WithLabelValues(op).Inc()
 		b.logger.Error("query error", zap.Error(err))
 		return nil, err
@@ -188,7 +193,7 @@ func (b *BoxRepository) GetBoxesForExport(ctx context.Context, statusFilter *str
 		return nil, err
 	}
 
-	op := "update"
+	op := "read"
 	ctxQ, cancel := context.WithTimeout(ctx, dbQueryTimeout)
 	start := time.Now()
 
