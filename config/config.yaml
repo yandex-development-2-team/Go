@@ -11,3 +11,8 @@ database:
 
 logger:
   level: "info"
+
+auth:
+  jwt_secret: "CHANGE_ME"
+  access_token_ttl_minutes: 15
+  refresh_token_ttl_hours: 168

@@ -9,10 +9,17 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig    `yaml:"server"`
-	Telegram  TelegramConfig  `yaml:"telegram"`
-	Database  DatabaseConfig  `yaml:"database"`
-	Logger    LoggerConfig    `yaml:"logger"`
+	Server   ServerConfig   `yaml:"server"`
+	Telegram TelegramConfig `yaml:"telegram"`
+	Database DatabaseConfig `yaml:"database"`
+	Logger   LoggerConfig   `yaml:"logger"`
+	Auth     AuthConfig     `yaml:"auth"`
+}
+
+type AuthConfig struct {
+	JWTSecret             string `yaml:"jwt_secret"`
+	AccessTokenTTLMinutes int    `yaml:"access_token_ttl_minutes"`
+	RefreshTokenTTLHours  int    `yaml:"refresh_token_ttl_hours"`
 }
 
 type ServerConfig struct {

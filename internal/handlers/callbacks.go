@@ -21,14 +21,28 @@ type CallbackHandler interface {
 }
 
 func HandleCallback(router *CallbackRouter, query *tgbotapi.CallbackQuery) error {
+	if router == nil || router.logger == nil || router.handlers == nil || query == nil {
+		return fmt.Errorf("invalid callback router/query")
+	}
+	if metrics.Default == nil {
+		return fmt.Errorf("metrics not initialized")
+	}
+	if query.Data == "" {
+		return fmt.Errorf("empty callback data")
+	}
+	button := query.Data
+
+	handler, ok := router.handlers[button]
+	if !ok || handler == nil {
+		return fmt.Errorf("handler not found")
+	}
+
 	start := time.Now()
 
 	metrics.Default.ActiveUsers.Inc()
 	defer metrics.Default.ActiveUsers.Dec()
 
 	metrics.Default.CallbacksReceived.Inc()
-	// Получаем и находим нужный handler в карте handlers
-	button := query.Data
 
 	var handlerErr error
 	defer func() {
@@ -42,18 +56,9 @@ func HandleCallback(router *CallbackRouter, query *tgbotapi.CallbackQuery) error
 		)
 	}()
 
-	handler, ok := router.handlers[button]
-	if !ok {
-		// Если handler не найден, возвращаем ошибку или логируем событие
-		err := fmt.Errorf("oбработчик для идентификатора кнопки не найден")
-		router.logger.Error("handler не найден для кнопки", zap.Error(err), zap.String("button", button))
-		return err
-	}
-
-	// Вызываем метод Handle у найденного handler'а
-
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
+
 	err := handler.Handle(ctx, query)
 	if err != nil {
 		handlerErr = err
@@ -67,6 +72,5 @@ func HandleCallback(router *CallbackRouter, query *tgbotapi.CallbackQuery) error
 		zap.String("button", button),
 		zap.String("callback_id", query.ID),
 	)
-	return err
-
+	return nil
 }

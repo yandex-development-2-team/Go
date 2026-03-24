@@ -7,6 +7,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/yandex-development-2-team/Go/internal/metrics"
 	"go.uber.org/zap"
 )
 
@@ -24,6 +25,7 @@ func (b *ButtonHandlerTwo) Handle(ctx context.Context, q *tgbotapi.CallbackQuery
 	return nil
 }
 func TestHandleCallback(t *testing.T) {
+	_, _ = metrics.NewMetrics(zap.NewNop())
 	logger := zap.NewExample()
 	defer logger.Sync()
 
